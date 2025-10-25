@@ -281,7 +281,7 @@ public class Main extends Application {
         yAxis.setLabel("Price (USD)");
 
         stockChart = new LineChart<>(xAxis, yAxis);
-        stockChart.setTitle("Stock Performance (Click a stock to view");
+        stockChart.setTitle("Stock Performance (Click a stock to view)");
         stockChart.setCreateSymbols(false);
         stockChart.setAnimated(false);
         stockChart.setPrefHeight(300);
