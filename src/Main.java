@@ -1,4 +1,5 @@
 import portfolioManagerGUI.*;
+
 import javafx.application.Application;
 import javafx.collections.ObservableList;
 import javafx.geometry.*;
@@ -7,6 +8,7 @@ import javafx.scene.control.*;
 import javafx.scene.chart.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.Stage;
+import javafx.scene.image.Image;
 
 import java.text.NumberFormat;
 import java.util.Locale;
@@ -19,10 +21,12 @@ public class Main extends Application {
     private final TableView<PortfolioItem> table = new TableView<>();
     private final TableView<StockItem> stockListTable = new TableView<>();
     private StockManager sm;
-    private TextField symbolInput;
-    private TextField quantityInput;
+    private TextField symbolField;
+    private TextField quantityField;
     private Label totalPLLabel;
     private Label totalInvestedLabel;
+    private Label totalValueLabel;
+    private Label totalPLPercentLabel;
     private LineChart<String, Number> stockChart;
 
     public static void main(String[] args) {
@@ -34,13 +38,28 @@ public class Main extends Application {
     public void start(Stage primaryStage) {
 
         primaryStage.setTitle("Portfolio Manager");
+
+        try {
+            Image icon = new Image(getClass().getResourceAsStream("image.jpeg"));
+            primaryStage.getIcons().add(icon);
+        }catch(Exception e){
+            System.out.println("Error loading application icon: image.jpeg");
+            e.printStackTrace();
+        }
         sm = new StockManager();
 
         TabPane tabPane = new TabPane();
         tabPane.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
         BorderPane portfolioLayout = new BorderPane();
-        portfolioLayout.setTop(createAddStockPanel());
+        portfolioLayout.getStyleClass().add("content-panel");
+
+        HBox addStockBar = createAddStockPanel();
+
+        portfolioLayout.setTop(addStockBar);
+
+        BorderPane.setMargin(addStockBar, new Insets(12, 20, 12, 20));
+
         portfolioLayout.setCenter(createPortfolioPanel());
 
         Tab portfolioTab = new Tab("My Portfolio");
@@ -53,6 +72,8 @@ public class Main extends Application {
         tabPane.getTabs().addAll(portfolioTab, stockListTab);
 
         Scene scene = new Scene(tabPane, 600, 800);
+        scene.getStylesheets().add(getClass().getResource("styles.css").toExternalForm());
+
         primaryStage.setScene(scene);
         primaryStage.show();
 
@@ -62,24 +83,30 @@ public class Main extends Application {
 
     private VBox createStockListPanel() {
         VBox panel = new VBox(10);
+        panel.getStyleClass().add("content-panel");
         panel.setPadding(new Insets(10));
 
+
         Label titleLabel = new Label("Master Stock List");
-        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        titleLabel.getStyleClass().add("title-label");
 
         TableColumn<StockItem, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
-        nameCol.prefWidthProperty().bind(table.widthProperty().multiply(0.33));
+        nameCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.50));
 
         TableColumn<StockItem, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(new PropertyValueFactory<>("symbol"));
-        symbolCol.prefWidthProperty().bind(table.widthProperty().multiply(0.33));
+        symbolCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.25));
 
         NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
         TableColumn<StockItem, Double> priceCol = createCurrencyColumn("Price", "price", currencyFormat);
-        priceCol.prefWidthProperty().bind(table.widthProperty().multiply(0.33));
+        priceCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.24));
 
+        stockListTable.getColumns().clear();
         stockListTable.getColumns().addAll(nameCol, symbolCol, priceCol);
+
+        stockListTable.getStyleClass().add("card");
+
 
         panel.getChildren().addAll(titleLabel, stockListTable);
         return panel;
@@ -94,38 +121,38 @@ public class Main extends Application {
 
     private HBox createAddStockPanel() {
 
-        HBox addPanel = new HBox(10);
-        addPanel.setPadding(new Insets(15, 12, 15, 12));
-        addPanel.setAlignment(Pos.CENTER_LEFT);
-        addPanel.setStyle("-fx-background-color: #f4f4f4; -fx-border-color: #c0c0c0; -fx-border-width: 0 0 1 0;");
+        HBox addStockBar = new HBox(16);
+        addStockBar.setAlignment(Pos.CENTER_LEFT);
+        addStockBar.getStyleClass().add("add-stock-panel");
 
-        Label symbolLabel = new Label("Symbol");
-        symbolInput = new TextField();
-        symbolInput.setPromptText("e.g., TSLA");
-        symbolInput.setPrefWidth(80);
+        Label symbolLabel = new Label ("Symbol");
+        symbolField = new TextField();
+        symbolField.setPromptText("e.g. TSLA");
+        symbolField.setPrefWidth(140);
 
-        Label qtyLabel = new Label("Quantity: ");
-        quantityInput = new TextField();
-        quantityInput.setPromptText("e.g., 10");
-        quantityInput.setPrefWidth(60);
+        Label quantityLabel = new Label ("Quantity");
+        quantityField = new TextField();
+        quantityField.setPromptText("e.g. 10");
+        quantityField.setPrefWidth(120);
 
         Button buyButton = new Button("Buy");
-        buyButton.setOnAction(e -> handleBuyStock());
+        buyButton.getStyleClass().add("buy-button");
+        buyButton.setOnAction(e->handleBuyStock());
 
-        Button sellButton = new Button("Sell");
-        sellButton.setOnAction(e -> handleSellStock());
+        Button sellButton = new Button ("Sell");
+        sellButton.getStyleClass().add("sell-button");
+        sellButton.setOnAction(e->handleSellStock());
 
-        VBox.setVgrow(stockListTable, Priority.ALWAYS);
+        addStockBar.getChildren().addAll(symbolLabel, symbolField, quantityLabel, quantityField, buyButton, sellButton);
 
-        addPanel.getChildren().addAll(symbolLabel, symbolInput, qtyLabel, quantityInput, buyButton, sellButton);
-        return addPanel;
+        return addStockBar;
 
     }
 
     private void handleBuyStock() {
 
-        String symbol = symbolInput.getText().trim().toUpperCase();
-        String qtyText = quantityInput.getText().trim();
+        String symbol = symbolField.getText().trim().toUpperCase();
+        String qtyText = quantityField.getText().trim();
 
         if (symbol.isEmpty() || qtyText.isEmpty()) {
             showAlert("Error", "Symbol and quantity fields cannot be empty");
@@ -156,8 +183,8 @@ public class Main extends Application {
             sm.addToPortfolio(symbol, quantity, buyPrice);
             System.out.printf("Added %d of %s at $%.2f%n", quantity, symbol, buyPrice);
 
-            symbolInput.clear();
-            quantityInput.clear();
+            symbolField.clear();
+            quantityField.clear();
             loadPortfolioData();
             loadStockListData();
         } else {
@@ -166,8 +193,8 @@ public class Main extends Application {
     }
 
     private void handleSellStock() {
-        String symbol = symbolInput.getText().trim().toUpperCase();
-        String qtyText = quantityInput.getText().trim();
+        String symbol = symbolField.getText().trim().toUpperCase();
+        String qtyText = quantityField.getText().trim();
 
         if (symbol.isEmpty() || qtyText.isEmpty()) {
             showAlert("Error", "Symbol and quantity fields cannot be empty.");
@@ -204,8 +231,8 @@ public class Main extends Application {
 
         System.out.printf("Sold %d of %s%n", quantityToSell, symbol);
 
-        symbolInput.clear();
-        quantityInput.clear();
+        symbolField.clear();
+        quantityField.clear();
         loadPortfolioData();
 
     }
@@ -231,25 +258,35 @@ public class Main extends Application {
         panel.setPadding(new Insets(10));
 
         Label titleLabel = new Label("My Portfolio");
-        titleLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
+        titleLabel.getStyleClass().add("title-label");
 
-        totalPLLabel = new Label("$0.00");
-        totalPLLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold;");
 
-        totalInvestedLabel = new Label("(Invested: $0.00)");
-        totalInvestedLabel.setStyle("-fx-font-size: 14px; -fx-font-weight: normal; -fx-text-fill: grey;");
+        totalValueLabel = new Label ("$0.00");
+        totalValueLabel.getStyleClass().add("total-value-label");
 
-        HBox titleBox = new HBox(10);
-        titleBox.setAlignment(Pos.CENTER_LEFT);
+        totalPLPercentLabel = new Label ("(0.00%)");
 
-        titleBox.getChildren().addAll(titleLabel, totalPLLabel, totalInvestedLabel);
+        totalPLLabel = new Label ("$0.00");
+        totalInvestedLabel = new Label ("(Invested: $0.00)");
+        totalInvestedLabel.getStyleClass().add("invested-label");
+
+        HBox detailsBox = new HBox(10);
+        detailsBox.setAlignment(Pos.CENTER_LEFT);
+        detailsBox.getChildren().addAll(totalPLLabel, totalPLPercentLabel, totalInvestedLabel);
+
+        VBox titleBox = new VBox(5);
+        titleBox.getChildren().addAll(titleLabel, totalValueLabel, detailsBox);
 
         HBox buttonBox = new HBox(10);
 
         Button refreshButton = new Button("Refresh Portfolio");
+        refreshButton.getStyleClass().add("update-button");
+
         refreshButton.setOnAction(e -> loadPortfolioData());
 
         Button updateAllButton = new Button("Update All Prices");
+        updateAllButton.getStyleClass().add("update-button");
+
         updateAllButton.setOnAction(e -> handleUpdateAllPrices());
 
         buttonBox.getChildren().addAll(refreshButton, updateAllButton);
@@ -273,6 +310,7 @@ public class Main extends Application {
         TableColumn<PortfolioItem, Double> plCol = createCurrencyColumn("Profit/Loss", "profitLoss", currencyFormat);
         plCol.prefWidthProperty().bind(table.widthProperty().multiply(0.23));
 
+        table.getColumns().clear();
         table.getColumns().addAll(symbolCol, qtyCol, buyCol, liveCol, plCol);
 
         CategoryAxis xAxis = new CategoryAxis();
@@ -284,7 +322,6 @@ public class Main extends Application {
         stockChart.setTitle("Stock Performance (Click a stock to view)");
         stockChart.setCreateSymbols(false);
         stockChart.setAnimated(false);
-        stockChart.setPrefHeight(300);
 
         table.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
 
@@ -293,8 +330,18 @@ public class Main extends Application {
             }
         });
 
-        VBox.setVgrow(table, Priority.ALWAYS);
-        VBox.setVgrow(stockChart, Priority.ALWAYS);
+
+
+        VBox.setMargin(titleBox, new Insets(0,20,10,20));
+        VBox.setMargin(buttonBox, new Insets(0,20,0,20));
+
+        VBox.setMargin(table, new Insets(10,20,6,20));
+        VBox.setMargin(stockChart, new Insets(20,20,20,20));
+
+        table.getStyleClass().add("card");
+
+        stockChart.getStyleClass().addAll("card", "chart-content");
+        stockChart.setPrefHeight(300);
 
         panel.getChildren().addAll(titleBox, buttonBox, table, stockChart);
         return panel;
@@ -387,19 +434,36 @@ public class Main extends Application {
         System.out.println("Data loaded into table");
 
         double totalPL = sm.getTotalPortfolioPL();
+        double totalInvested = sm.getTotalInvestedAmount();
+        double totalValue = totalInvested + totalPL;
+
+        double plPercent = (totalInvested ==0) ? 0.0 : (totalPL/totalInvested)*100;
 
         NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
+
+        totalValueLabel.setText(currencyFormat.format(totalValue));
+
         totalPLLabel.setText(currencyFormat.format(totalPL));
 
+        totalPLPercentLabel.setText(String.format("(%.2f%%)", plPercent));
+
+        totalInvestedLabel.setText(String.format("(Invested: %s)", currencyFormat.format(totalInvested)));
+        totalPLLabel.setText(currencyFormat.format(totalPL));
+
+        totalPLLabel.getStyleClass().removeAll("pl-label-profit", "pl-label-loss", "pl-label-zero");
+        totalPLPercentLabel.getStyleClass().removeAll("pl-label-profit", "pl-label-loss", "pl-label-zero");
+
+
+        totalPLLabel.getStyleClass().removeAll("pl-label-profit", "pl-label-loss", "pl-label-zero");
+
         if (totalPL > 0) {
-            totalPLLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: green;");
+            totalPLLabel.getStyleClass().add("pl-label-profit");
         } else if (totalPL < 0) {
-            totalPLLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: red;");
+            totalPLLabel.getStyleClass().add("pl-label-loss");
         } else {
-            totalPLLabel.setStyle("-fx-font-size: 16px; -fx-font-weight: bold; -fx-text-fill: black;");
+            totalPLLabel.getStyleClass().add("pl-label-zero");
         }
 
-        double totalInvested = sm.getTotalInvestedAmount();
         totalInvestedLabel.setText(String.format("(Invested: %s)", currencyFormat.format(totalInvested)));
     }
 }
