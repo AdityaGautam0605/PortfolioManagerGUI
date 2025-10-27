@@ -101,7 +101,8 @@ public class StockAPI {
     }
 
     public static ObservableList<HistoricalDataPoint> getHistoricalData(String symbol) {
-        ObservableList<HistoricalDataPoint> data = FXCollections.observableArrayList();
+        ObservableList<HistoricalDataPoint> fulldata = FXCollections.observableArrayList();
+        ObservableList<HistoricalDataPoint> filtereddata = FXCollections.observableArrayList();
         try {
             String urlStr = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=" + symbol + "&apikey=" + alphaVantageApiKey;
 
@@ -122,7 +123,7 @@ public class StockAPI {
 
             if (!json.has("Time Series (Daily)")) {
                 System.out.println("API Error (getHistoricalData for " + symbol + "): " + response.toString());
-                return data;
+                return filtereddata;
             }
 
             JSONObject timeSeries = json.getJSONObject("Time Series (Daily)");
@@ -133,14 +134,27 @@ public class StockAPI {
                 String date = dates.next();
                 JSONObject dayData = timeSeries.getJSONObject(date);
                 double price = dayData.getDouble("4. close");
-                data.add(new HistoricalDataPoint(date, price));
+                fulldata.add(new HistoricalDataPoint(date, price));
+            }
+            if(!fulldata.isEmpty()){
+                FXCollections.reverse(fulldata);
+
+                int interval = 10;
+                for(int i = 0; i< fulldata.size(); i++){
+                    if(i==0 || i%interval ==0 ){
+                        filtereddata.add(fulldata.get(i));
+                    }
+                    if(fulldata.size() > 0 && (fulldata.size()-1 )%interval != 0){
+                        filtereddata.add(fulldata.get(fulldata.size()-1));
+                    }
+                }
             }
 
-            FXCollections.reverse(data);
-            return data;
+
+            return filtereddata;
         } catch (Exception e) {
             System.out.println("API Error (getHistoricalData for " + symbol);
-            return data;
+            return filtereddata;
         }
     }
 }

@@ -446,7 +446,7 @@ public class Main extends Application {
                 return;
             }
 
-            stockChart.setTitle(symbol + " - Daily Price (Last 100 Days)");
+            stockChart.setTitle(symbol + " - Daily Price (Last 100 Days)/ ~10 Days Intervals");
 
             XYChart.Series<String, Number> series = new XYChart.Series<>();
             series.setName(symbol);
