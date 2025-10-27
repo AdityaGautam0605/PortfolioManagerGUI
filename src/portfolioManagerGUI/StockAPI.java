@@ -56,9 +56,8 @@ public class StockAPI {
                 return price;
             } else {
                 System.out.println("Finnhub API Error (getLivePrice for " + symbol + "): " + response.toString());
-                // --- ADD THIS LINE ---
                 System.out.println("DEBUG: Raw Finnhub Response: " + response.toString());
-                // --- END OF ADDITION ---
+
                 return -1.0;
             }
 
