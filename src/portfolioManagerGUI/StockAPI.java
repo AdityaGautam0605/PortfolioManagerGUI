@@ -11,7 +11,9 @@ import java.util.Iterator;
 
 public class StockAPI {
 
-    private static final String API_key = "***REMOVED***";
+    private static final String alphaVantageApiKey = "***REMOVED***";
+    private static final String finnhubApiKey = "d3vhg71r01qt2ctpq840d3vhg71r01qt2ctpq84g";
+
 
     public static StockData getStockData(String symbol) {
 
@@ -28,7 +30,7 @@ public class StockAPI {
     public static double getLivePrice(String symbol) {
 
         try {
-            String urlStr = "https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=" + symbol + "&apikey=" + API_key;
+            String urlStr = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&apikey=" + finnhubApiKey;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -44,14 +46,18 @@ public class StockAPI {
             reader.close();
             JSONObject json = new JSONObject(response.toString());
 
-            if (json.has("Global Quote")) {
-                JSONObject quote = json.getJSONObject("Global Quote");
-                return quote.getDouble("05. price");
+            if (json.has("c")) {
+                double price = json.getDouble("c");
+
+                if(price ==0 && json.has("pc")){
+                    price = json.getDouble("pc");
+                }
+
+                return price;
             } else {
                 System.out.println("API Error (getLivePrice for " + symbol + "): " + response.toString());
                 return -1.0;
             }
-
 
         } catch (Exception e) {
             System.out.println("Could not fetch price for: " + symbol);
@@ -64,7 +70,7 @@ public class StockAPI {
     private static String getStockName(String symbol) {
 
         try {
-            String urlStr = "https://www.alphavantage.co/query?function=OVERVIEW&symbol=" + symbol + "&apikey=" + API_key;
+            String urlStr = "https://www.alphavantage.co/query?function=OVERVIEW&symbol=" + symbol + "&apikey=" + alphaVantageApiKey;
 
             URL url = new URL(urlStr);
 
@@ -97,7 +103,7 @@ public class StockAPI {
     public static ObservableList<HistoricalDataPoint> getHistoricalData(String symbol) {
         ObservableList<HistoricalDataPoint> data = FXCollections.observableArrayList();
         try {
-            String urlStr = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=" + symbol + "&apikey=" + API_key;
+            String urlStr = "https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=" + symbol + "&apikey=" + alphaVantageApiKey;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
