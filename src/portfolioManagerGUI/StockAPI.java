@@ -12,7 +12,7 @@ import java.util.Iterator;
 public class StockAPI {
 
     private static final String alphaVantageApiKey = "***REMOVED***";
-    private static final String finnhubApiKey = "d3vhg71r01qt2ctpq840d3vhg71r01qt2ctpq84g";
+    private static final String finnhubApiKey = "***REMOVED***";
 
 
     public static StockData getStockData(String symbol) {
@@ -30,7 +30,7 @@ public class StockAPI {
     public static double getLivePrice(String symbol) {
 
         try {
-            String urlStr = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&apikey=" + finnhubApiKey;
+            String urlStr = "https://finnhub.io/api/v1/quote?symbol=" + symbol + "&token=" + finnhubApiKey;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -55,7 +55,10 @@ public class StockAPI {
 
                 return price;
             } else {
-                System.out.println("API Error (getLivePrice for " + symbol + "): " + response.toString());
+                System.out.println("Finnhub API Error (getLivePrice for " + symbol + "): " + response.toString());
+                // --- ADD THIS LINE ---
+                System.out.println("DEBUG: Raw Finnhub Response: " + response.toString());
+                // --- END OF ADDITION ---
                 return -1.0;
             }
 
