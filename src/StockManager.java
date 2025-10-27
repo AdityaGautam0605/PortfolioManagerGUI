@@ -247,7 +247,21 @@ public class StockManager {
     public ObservableList<StockItem> getAllStocks() {
         ObservableList<StockItem> stockList = FXCollections.observableArrayList();
 
-        String query = "SELECT symbol, name, price FROM stocks ORDER BY name";
+        String query = """
+                    SELECT 
+                        s.symbol, 
+                        s.name, 
+                        s.price, 
+                        COALESCE(SUM(p.quantity), 0) > 0 AS is_holding 
+                    FROM 
+                    stocks s
+                LEFT JOIN 
+                    portfolio p ON s.symbol = p.symbol
+                GROUP BY 
+                    s.symbol, s.name, s.price
+                ORDER BY 
+                    s.name;
+                """;
 
         try (Connection conn = DatabaseConnection.getConnection();
              PreparedStatement stmt = conn.prepareStatement(query);
@@ -257,7 +271,8 @@ public class StockManager {
                 stockList.add(new StockItem(
                         rs.getString("symbol"),
                         rs.getString("name"),
-                        rs.getDouble("price")
+                        rs.getDouble("price"),
+                        rs.getBoolean("is_holding")
                 ));
             }
         } catch (SQLException e) {
@@ -304,6 +319,24 @@ public class StockManager {
             e.printStackTrace();
         }
         return 0.0;
+    }
+
+    public boolean deletePortfolioPosition(String symbol) {
+        String query = "DELETE FROM portfolio WHERE symbol = ?";
+
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, symbol);
+            int rowsAffected = stmt.executeUpdate();
+
+            System.out.println("Deleted " + rowsAffected + " entries for symbol: " + symbol);
+            return rowsAffected > 0;
+        } catch (SQLException e) {
+            System.out.println("Error deleting portfolio position for: " + symbol);
+            e.printStackTrace();
+            return false;
+        }
     }
 
 }

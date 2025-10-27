@@ -1,3 +1,4 @@
+import javafx.scene.paint.Color;
 import portfolioManagerGUI.*;
 
 import javafx.application.Application;
@@ -11,10 +12,12 @@ import javafx.stage.Stage;
 import javafx.scene.image.Image;
 
 import java.text.NumberFormat;
-import java.util.Locale;
+import java.util.*;
 
 import javafx.scene.layout.*;
 import javafx.concurrent.Task;
+
+import java.text.*;
 
 public class Main extends Application {
 
@@ -92,7 +95,7 @@ public class Main extends Application {
 
         TableColumn<StockItem, String> nameCol = new TableColumn<>("Name");
         nameCol.setCellValueFactory(new PropertyValueFactory<>("name"));
-        nameCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.50));
+        nameCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.30));
 
         TableColumn<StockItem, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(new PropertyValueFactory<>("symbol"));
@@ -102,8 +105,27 @@ public class Main extends Application {
         TableColumn<StockItem, Double> priceCol = createCurrencyColumn("Price", "price", currencyFormat);
         priceCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.24));
 
+        TableColumn<StockItem, Boolean> holdingCol = new TableColumn<>("Holding");
+        holdingCol.setCellValueFactory(new PropertyValueFactory<>("holding"));
+        holdingCol.prefWidthProperty().bind(stockListTable.widthProperty().multiply(0.20));
+
+        holdingCol.setCellFactory(col->new TableCell<StockItem, Boolean>(){
+            @Override
+                    protected void updateItem(Boolean item, boolean empty){
+                        super.updateItem (item, empty);
+                        if(empty|| item == null){
+                            setText (null);
+                        }else{
+                            setText(item ? "YES" : "NO");
+                            setAlignment(Pos.CENTER);
+                        }
+            }
+        });
+
         stockListTable.getColumns().clear();
-        stockListTable.getColumns().addAll(nameCol, symbolCol, priceCol);
+
+        stockListTable.getColumns().addAll(nameCol, symbolCol, priceCol, holdingCol);
+        stockListTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
         stockListTable.getStyleClass().add("card");
 
@@ -234,6 +256,7 @@ public class Main extends Application {
         symbolField.clear();
         quantityField.clear();
         loadPortfolioData();
+        loadStockListData();
 
     }
 
@@ -302,17 +325,69 @@ public class Main extends Application {
         qtyCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
 
         TableColumn<PortfolioItem, Double> buyCol = createCurrencyColumn("Avg. Buy Price", "avgBuyPrice", currencyFormat);
-        buyCol.prefWidthProperty().bind(table.widthProperty().multiply(0.23));
+        buyCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
 
         TableColumn<PortfolioItem, Double> liveCol = createCurrencyColumn("Live Price", "currentPrice", currencyFormat);
-        liveCol.prefWidthProperty().bind(table.widthProperty().multiply(0.23));
+        liveCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
 
         TableColumn<PortfolioItem, Double> plCol = createCurrencyColumn("Profit/Loss", "profitLoss", currencyFormat);
-        plCol.prefWidthProperty().bind(table.widthProperty().multiply(0.23));
+        plCol.prefWidthProperty().bind(table.widthProperty().multiply(0.18));
 
+        TableColumn<PortfolioItem, Double> plPercentCol = new TableColumn<>("P/L %");
+        plPercentCol.setCellValueFactory(new PropertyValueFactory<>("profitLossPercent"));
+        plPercentCol.prefWidthProperty().bind (table.widthProperty().multiply(0.12));
+
+        plPercentCol.setCellFactory(col -> new TableCell<PortfolioItem, Double>(){
+
+            private final DecimalFormat  percentFormat = new DecimalFormat ("+#,##0.00'%");
+
+            @Override
+            protected void updateItem(Double item, boolean empty){
+                super.updateItem(item, empty);
+
+                if(empty|| item ==null){
+                    setText(null);
+                    setStyle("");
+                }else {
+                    setText(percentFormat.format(item));
+
+                    if(item >0){
+                        setTextFill(Color.LIMEGREEN);
+
+                    }else if (item < 0){
+                        setTextFill(Color.RED);
+                    }else{
+                        setTextFill(Color.DARKGRAY);
+                    }
+                }
+            }
+        });
         table.getColumns().clear();
         table.getColumns().addAll(symbolCol, qtyCol, buyCol, liveCol, plCol);
 
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
+
+        ContextMenu contextMenu = new ContextMenu();
+        MenuItem deleteItem = new MenuItem ("Delete Position");
+
+        deleteItem.setOnAction (event->{
+            PortfolioItem selectedItem = table.getSelectionModel().getSelectedItem();
+            if(selectedItem != null){
+                handleDeletePosition(selectedItem);
+            }
+        });
+
+        contextMenu.getItems().add(deleteItem);
+
+        table.setRowFactory(tv->{
+            TableRow<PortfolioItem> row = new TableRow<>();
+            row.setOnContextMenuRequested(event -> {
+                if (!row.isEmpty()) {
+                    contextMenu.show(row, event.getScreenX(), event.getScreenY());
+                }
+            });
+            return row;
+        });
         CategoryAxis xAxis = new CategoryAxis();
         xAxis.setLabel("Date");
         NumberAxis yAxis = new NumberAxis();
@@ -394,6 +469,31 @@ public class Main extends Application {
 
     }
 
+    private void handleDeletePosition(PortfolioItem itemToDelete){
+        String symbol = itemToDelete.getSymbol();
+
+        Alert confirmation = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmation.setTitle("Confirm Deletion");
+        confirmation.setHeaderText("Delete all positions for " + symbol + "?");
+        confirmation.setContentText("Are you sure you want to remove all your holdings of " + symbol + "? This action cannot be undone.");
+
+
+        Optional<ButtonType> result = confirmation.showAndWait();
+
+        if(result.isPresent() && result.get() == ButtonType.OK){
+            boolean success = sm.deletePortfolioPosition(symbol);
+            if(success){
+                loadPortfolioData();
+                loadStockListData();
+                stockChart.getData().clear();
+                stockChart.setTitle("Stock Performance (Click a stock to view)");
+
+            }else {
+                showAlert("Error", "Failed to delete position for " + symbol + ".");
+            }
+        }
+    }
+
     private <T> TableColumn<T, Double> createCurrencyColumn(String title, String propertyName, NumberFormat format) {
 
         TableColumn<T, Double> col = new TableColumn<>(title);
@@ -465,5 +565,7 @@ public class Main extends Application {
         }
 
         totalInvestedLabel.setText(String.format("(Invested: %s)", currencyFormat.format(totalInvested)));
+
+        loadStockListData();
     }
 }

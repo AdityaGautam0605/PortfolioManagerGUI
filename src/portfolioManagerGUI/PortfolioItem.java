@@ -7,6 +7,7 @@ public class PortfolioItem {
     private final double avgBuyPrice;
     private final double currentPrice;
     private final double profitLoss;
+    private final double profitLossPercent;
 
     public PortfolioItem(String symbol, int quantity,
                          double avgBuyPrice, double currentPrice,
@@ -16,6 +17,14 @@ public class PortfolioItem {
         this.avgBuyPrice = avgBuyPrice;
         this.currentPrice = currentPrice;
         this.profitLoss = profitLoss;
+
+        double costBasis = avgBuyPrice * quantity;
+
+        if(costBasis != 0){
+            this.profitLossPercent = (profitLoss/ costBasis) *100.0;
+        }else {
+            this.profitLossPercent = 0.0;
+        }
     }
 
     public String getSymbol() {
@@ -36,6 +45,10 @@ public class PortfolioItem {
 
     public double getProfitLoss() {
         return profitLoss;
+    }
+
+    public double getProfitLossPercent(){
+        return profitLossPercent;
     }
 
 }
