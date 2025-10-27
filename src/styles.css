@@ -277,10 +277,17 @@
     /* White text */
 }
 
-/* --- Remove focus ring from selected tab header --- */
-.tab:selected:focused {
-    -fx-focus-color: #FFFFFF;
-    /* Makes the focus ring invisible */
-    -fx-outer-border: #FFFFFF;
-    /* Also remove outer border just in case */
+.tab {
+    display: inline-block;
+    padding: 8px 16px;
+    margin-right: 8px;
+    border: none;
+    background: none;
+}
+
+.tab.active {
+    background: #fff;
+    border-bottom: 2px solid #ffffff;
+    box-shadow: none;
+    z-index: 1;
 }
