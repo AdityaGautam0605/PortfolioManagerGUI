@@ -1,4 +1,3 @@
-/* ===================== GLOBAL BACKGROUND ===================== */
 .root,
 .tab-pane,
 .content-panel {
@@ -7,7 +6,6 @@
     -fx-text-fill: #333333;
 }
 
-/* ===================== TABS ===================== */
 .tab-header-background {
     -fx-background-color: #E8EBED;
 }
@@ -25,7 +23,6 @@
     -fx-border-width: 0 0 2 0;
 }
 
-/* ===================== LABELS ===================== */
 .label {
     -fx-text-fill: #333333;
 }
@@ -36,7 +33,6 @@
     -fx-text-fill: #111111;
 }
 
-/* ===================== TEXT FIELDS ===================== */
 .text-field {
     -fx-background-color: #FFFFFF;
     -fx-text-fill: #333333;
@@ -50,7 +46,6 @@
     -fx-border-color: #4A90E2;
 }
 
-/* ===================== BUTTONS ===================== */
 .button {
     -fx-font-weight: bold;
     -fx-background-radius: 4px;
@@ -63,7 +58,6 @@
     -fx-background-color: #D5DADF;
 }
 
-/* Buy Button */
 .buy-button {
     -fx-background-color: #4A90E2;
     -fx-text-fill: white;
@@ -73,7 +67,6 @@
     -fx-background-color: #6AABF0;
 }
 
-/* Sell Button */
 .sell-button {
     -fx-background-color: #E25454;
     -fx-text-fill: white;
@@ -83,7 +76,6 @@
     -fx-background-color: #F07575;
 }
 
-/* Update Button */
 .update-button {
     -fx-background-color: #AAB4BC;
     -fx-text-fill: white;
@@ -93,7 +85,6 @@
     -fx-background-color: #C3CBD1;
 }
 
-/* ===================== TOP STOCK INPUT BAR ===================== */
 .add-stock-panel {
     -fx-background-color: #FFFFFF;
     -fx-padding: 10;
@@ -101,7 +92,6 @@
     -fx-border-width: 0 0 1 0;
 }
 
-/* ===================== TABLEVIEW ===================== */
 .table-view {
 
     -fx-border-radius: 4px;
@@ -114,7 +104,7 @@
 
 .table-view .column-header {
     -fx-border-color: #78909C;
-    /* Match outer border */
+
     -fx-border-width: 0 0 1px 0;
 }
 
@@ -139,7 +129,6 @@
     -fx-alignment: CENTER;
 }
 
-/* ===================== CHART ===================== */
 .chart-plot-background {
     -fx-background-color: #FFFFFF;
 }
@@ -157,7 +146,6 @@
     -fx-text-fill: #555555;
 }
 
-/* ===================== PROFIT/LOSS COLORS ===================== */
 .pl-label-profit {
     -fx-text-fill: #2E7D32;
 }
@@ -178,7 +166,6 @@
     -fx-padding: 16px;
 }
 
-/* Improve table's look inside card */
 .table-view {
     -fx-background-insets: 0;
     -fx-background-radius: 6px;
@@ -190,7 +177,6 @@
     -fx-background-radius: 6px 6px 0 0;
 }
 
-/* Chart card spacing */
 .chart-content {
     -fx-background-color: #FFFFFF;
     -fx-padding: 16px;
@@ -199,46 +185,39 @@
     -fx-border-radius: 8px;
 }
 
-/* --- New Label Styles --- */
 .total-value-label {
     -fx-font-size: 28px;
     -fx-font-weight: bold;
     -fx-text-fill: #000000;
-    /* White */
+
 }
 
 .invested-label {
     -fx-font-size: 14px;
     -fx-font-weight: normal;
     -fx-text-fill: #BDBDBD;
-    /* Light grey */
+
 }
 
-/* --- Table & Scrollbar Styling --- */
-
-/* Center-align all table cell text */
 .table-view .table-cell {
     -fx-alignment: CENTER;
     -fx-border-color: #d1dada;
-    /* Darker border for cells */
+
 }
 
-/* Style the empty table placeholder */
 .table-view .placeholder .label {
     -fx-text-fill: #dbd6d6;
-    /* Light grey text */
+
 }
 
-/* Style the main scrollbar track */
 .table-view .scroll-bar {
     -fx-background-color: #3D3D3D;
-    /* Dark background */
+
 }
 
-/* Style the scrollbar handle */
 .table-view .scroll-bar .thumb {
     -fx-background-color: #546E7A;
-    /* Blue-grey handle */
+
     -fx-background-radius: 4px;
 }
 
@@ -246,7 +225,6 @@
     -fx-background-color: #78909C;
 }
 
-/* Hide the ugly arrow buttons on the scrollbar */
 .table-view .scroll-bar .increment-button,
 .table-view .scroll-bar .decrement-button {
     -fx-background-color: transparent;
@@ -261,20 +239,20 @@
 
 .table-view .column-header {
     -fx-background-color: #7bb2cd;
-    /* Slate blue (matches tab bar) */
+
     -fx-font-weight: bold;
     -fx-font-size: 14px;
 
-    /* White text */
+
     -fx-border-color: #546E7A;
-    /* Darker border */
+
     -fx-border-width: 0 1px 1px 0;
-    /* Thin lines */
+
 }
 
 .table-view .column-header .label {
     -fx-text-fill: #FFFFFF;
-    /* White text */
+
 }
 
 .tab {
@@ -286,7 +264,7 @@
 }
 
 .tab.active {
-    background: #fff;
+    m-background: #fff;
     border-bottom: 2px solid #ffffff;
     box-shadow: none;
     z-index: 1;
