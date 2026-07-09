@@ -16,6 +16,8 @@ import java.util.*;
 
 import javafx.scene.layout.*;
 import javafx.concurrent.Task;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import java.text.*;
 
@@ -31,6 +33,15 @@ public class Main extends Application {
     private Label totalValueLabel;
     private Label totalPLPercentLabel;
     private LineChart<String, Number> stockChart;
+    private final ExecutorService executor = Executors.newFixedThreadPool(4, r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+    });
+
+    private static final Color POSITIVE_COLOR = Color.web("#3fb950");
+    private static final Color NEGATIVE_COLOR = Color.web("#f85149");
+    private static final Color MUTED_COLOR = Color.web("#8b98a5");
 
     public static void main(String[] args) {
 
@@ -82,6 +93,11 @@ public class Main extends Application {
 
         loadPortfolioData();
         loadStockListData();
+    }
+
+    @Override
+    public void stop() {
+        executor.shutdownNow();
     }
 
     private VBox createStockListPanel() {
@@ -195,23 +211,36 @@ public class Main extends Application {
         }
 
         System.out.println("Adding/Updating " + symbol + " in master stocks list...");
-        sm.storeLiveStock(symbol);
 
-        sm.updateStockPrice(symbol);
+        Task<Double> buyTask = new Task<>() {
+            @Override
+            protected Double call() {
+                sm.storeLiveStock(symbol);
+                sm.updateStockPrice(symbol);
+                double price = sm.getPriceFromDB(symbol);
+                if (price != -1.0) {
+                    sm.addToPortfolio(symbol, quantity, price);
+                }
+                return price;
+            }
+        };
 
-        double buyPrice = sm.getPriceFromDB(String.valueOf(symbol));
+        buyTask.setOnSucceeded(e -> {
+            double buyPrice = buyTask.getValue();
+            if (buyPrice != -1.0) {
+                System.out.printf("Added %d of %s at $%.2f%n", quantity, symbol, buyPrice);
+                symbolField.clear();
+                quantityField.clear();
+                loadPortfolioData();
+                loadStockListData();
+            } else {
+                showAlert("Error", "Stock symbol not found or price could not be fetched.");
+            }
+        });
 
-        if (buyPrice != -1.0) {
-            sm.addToPortfolio(symbol, quantity, buyPrice);
-            System.out.printf("Added %d of %s at $%.2f%n", quantity, symbol, buyPrice);
+        buyTask.setOnFailed(e -> showAlert("Error", "Could not complete the buy. Check your connection and try again."));
 
-            symbolField.clear();
-            quantityField.clear();
-            loadPortfolioData();
-            loadStockListData();
-        } else {
-            showAlert("Error", "Stock symbol not found or price could not be fetched");
-        }
+        executor.execute(buyTask);
     }
 
     private void handleSellStock() {
@@ -235,44 +264,63 @@ public class Main extends Application {
             return;
         }
 
-        PortfolioItem position = sm.getPortfolioPosition(symbol);
+        Task<String> sellTask = new Task<>() {
+            @Override
+            protected String call() {
+                PortfolioItem position = sm.getPortfolioPosition(symbol);
+                if (position == null) {
+                    return "You don't own any shares of " + symbol + ".";
+                }
+                if (quantityToSell > position.getQuantity()) {
+                    return "You are trying to sell " + quantityToSell + " shares, but you only own " + position.getQuantity() + ".";
+                }
+                sm.addToPortfolio(symbol, -quantityToSell, position.getAvgBuyPrice());
+                return null; // null == success
+            }
+        };
 
-        if (position == null) {
-            showAlert("Error", "You are trying to sell " + quantityToSell + "shares, but you only own " + position.getQuantity() + ".");
-            return;
-        }
+        sellTask.setOnSucceeded(e -> {
+            String error = sellTask.getValue();
+            if (error != null) {
+                showAlert("Error", error);
+            } else {
+                System.out.printf("Sold %d of %s%n", quantityToSell, symbol);
+                symbolField.clear();
+                quantityField.clear();
+                loadPortfolioData();
+                loadStockListData();
+            }
+        });
 
-        if (quantityToSell > position.getQuantity()) {
-            showAlert("Error", "You are trying to sell " + quantityToSell + " shares, but you only own " + position.getQuantity() + ".");
-            return;
-        }
+        sellTask.setOnFailed(e -> showAlert("Error", "Could not complete the sell. Check your connection and try again."));
 
-        double avgBuyPrice = position.getAvgBuyPrice();
-
-        sm.addToPortfolio(symbol, -quantityToSell, avgBuyPrice);
-
-        System.out.printf("Sold %d of %s%n", quantityToSell, symbol);
-
-        symbolField.clear();
-        quantityField.clear();
-        loadPortfolioData();
-        loadStockListData();
-
+        executor.execute(sellTask);
     }
 
     private void handleUpdateAllPrices() {
         System.out.println("Update All Prices button clicked.");
 
-        sm.updateAllStockPrices();
-        loadPortfolioData();
+        Task<Void> updateTask = new Task<>() {
+            @Override
+            protected Void call() {
+                sm.updateAllStockPrices();
+                return null;
+            }
+        };
 
-        loadStockListData();
+        updateTask.setOnSucceeded(e -> {
+            loadPortfolioData();
+            loadStockListData();
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Update Complete");
+            alert.setHeaderText(null);
+            alert.setContentText("All stock prices have been updated.");
+            alert.showAndWait();
+        });
 
-        Alert alert = new Alert(Alert.AlertType.INFORMATION);
-        alert.setTitle("Update Complete");
-        alert.setHeaderText(null);
-        alert.setContentText("All stock prices have been updated");
-        alert.showAndWait();
+        updateTask.setOnFailed(e -> showAlert("Error", "Could not update prices. Check your connection and try again."));
+
+        executor.execute(updateTask);
     }
 
     private VBox createPortfolioPanel() {
@@ -280,32 +328,34 @@ public class Main extends Application {
         VBox panel = new VBox(10);
         panel.setPadding(new Insets(10));
 
-        Label titleLabel = new Label("My Portfolio");
-        titleLabel.getStyleClass().add("title-label");
+        totalValueLabel = new Label("$0.00");
+        totalValueLabel.getStyleClass().add("stat-value");
+        VBox valueCard = createStatCard("TOTAL VALUE", totalValueLabel, null);
 
+        totalPLLabel = new Label("$0.00");
+        totalPLLabel.getStyleClass().add("stat-value");
+        totalPLPercentLabel = new Label("0.00%");
+        totalPLPercentLabel.getStyleClass().add("stat-sub");
+        VBox plCard = createStatCard("TOTAL PROFIT / LOSS", totalPLLabel, totalPLPercentLabel);
 
-        totalValueLabel = new Label ("$0.00");
-        totalValueLabel.getStyleClass().add("total-value-label");
+        totalInvestedLabel = new Label("$0.00");
+        totalInvestedLabel.getStyleClass().add("stat-value");
+        VBox investedCard = createStatCard("INVESTED", totalInvestedLabel, null);
 
-        totalPLPercentLabel = new Label ("(0.00%)");
-
-        totalPLLabel = new Label ("$0.00");
-        totalInvestedLabel = new Label ("(Invested: $0.00)");
-        totalInvestedLabel.getStyleClass().add("invested-label");
-
-        HBox detailsBox = new HBox(10);
-        detailsBox.setAlignment(Pos.CENTER_LEFT);
-        detailsBox.getChildren().addAll(totalPLLabel, totalPLPercentLabel, totalInvestedLabel);
-
-        VBox titleBox = new VBox(5);
-        titleBox.getChildren().addAll(titleLabel, totalValueLabel, detailsBox);
+        HBox summaryBox = new HBox(14, valueCard, plCard, investedCard);
+        HBox.setHgrow(valueCard, Priority.ALWAYS);
+        HBox.setHgrow(plCard, Priority.ALWAYS);
+        HBox.setHgrow(investedCard, Priority.ALWAYS);
 
         HBox buttonBox = new HBox(10);
 
         Button refreshButton = new Button("Refresh Portfolio");
         refreshButton.getStyleClass().add("update-button");
 
-        refreshButton.setOnAction(e -> loadPortfolioData());
+        refreshButton.setOnAction(e -> {
+            loadPortfolioData();
+            loadStockListData();
+        });
 
         Button updateAllButton = new Button("Update All Prices");
         updateAllButton.getStyleClass().add("update-button");
@@ -319,10 +369,12 @@ public class Main extends Application {
         TableColumn<PortfolioItem, String> symbolCol = new TableColumn<>("Symbol");
         symbolCol.setCellValueFactory(new PropertyValueFactory<>("symbol"));
         symbolCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+        symbolCol.setStyle("-fx-alignment: center-left;");
 
         TableColumn<PortfolioItem, Integer> qtyCol = new TableColumn<>("Quantity");
         qtyCol.setCellValueFactory(new PropertyValueFactory<>("quantity"));
         qtyCol.prefWidthProperty().bind(table.widthProperty().multiply(0.15));
+        qtyCol.setStyle("-fx-alignment: center-right;");
 
         TableColumn<PortfolioItem, Double> buyCol = createCurrencyColumn("Avg. Buy Price", "avgBuyPrice", currencyFormat);
         buyCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
@@ -330,16 +382,31 @@ public class Main extends Application {
         TableColumn<PortfolioItem, Double> liveCol = createCurrencyColumn("Live Price", "currentPrice", currencyFormat);
         liveCol.prefWidthProperty().bind(table.widthProperty().multiply(0.20));
 
-        TableColumn<PortfolioItem, Double> plCol = createCurrencyColumn("Profit/Loss", "profitLoss", currencyFormat);
+        TableColumn<PortfolioItem, Double> plCol = new TableColumn<>("Profit/Loss");
+        plCol.setCellValueFactory(new PropertyValueFactory<>("profitLoss"));
         plCol.prefWidthProperty().bind(table.widthProperty().multiply(0.18));
+        plCol.setStyle("-fx-alignment: center-right;");
+        plCol.setCellFactory(col -> new TableCell<PortfolioItem, Double>() {
+            @Override
+            protected void updateItem(Double item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText((item >= 0 ? "+" : "") + currencyFormat.format(item));
+                    setTextFill(item > 0 ? POSITIVE_COLOR : item < 0 ? NEGATIVE_COLOR : MUTED_COLOR);
+                }
+            }
+        });
 
         TableColumn<PortfolioItem, Double> plPercentCol = new TableColumn<>("P/L %");
         plPercentCol.setCellValueFactory(new PropertyValueFactory<>("profitLossPercent"));
         plPercentCol.prefWidthProperty().bind (table.widthProperty().multiply(0.12));
+        plPercentCol.setStyle("-fx-alignment: center-right;");
 
         plPercentCol.setCellFactory(col -> new TableCell<PortfolioItem, Double>(){
 
-            private final DecimalFormat  percentFormat = new DecimalFormat ("+#,##0.00'%");
+            private final DecimalFormat percentFormat = new DecimalFormat("+#,##0.00'%';-#,##0.00'%'");
 
             @Override
             protected void updateItem(Double item, boolean empty){
@@ -351,19 +418,12 @@ public class Main extends Application {
                 }else {
                     setText(percentFormat.format(item));
 
-                    if(item >0){
-                        setTextFill(Color.LIMEGREEN);
-
-                    }else if (item < 0){
-                        setTextFill(Color.RED);
-                    }else{
-                        setTextFill(Color.DARKGRAY);
-                    }
+                    setTextFill(item > 0 ? POSITIVE_COLOR : item < 0 ? NEGATIVE_COLOR : MUTED_COLOR);
                 }
             }
         });
         table.getColumns().clear();
-        table.getColumns().addAll(symbolCol, qtyCol, buyCol, liveCol, plCol);
+        table.getColumns().addAll(symbolCol, qtyCol, buyCol, liveCol, plCol, plPercentCol);
 
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_ALL_COLUMNS);
 
@@ -407,7 +467,7 @@ public class Main extends Application {
 
 
 
-        VBox.setMargin(titleBox, new Insets(0,20,10,20));
+        VBox.setMargin(summaryBox, new Insets(10,20,10,20));
         VBox.setMargin(buttonBox, new Insets(0,20,0,20));
 
         VBox.setMargin(table, new Insets(10,20,6,20));
@@ -418,13 +478,13 @@ public class Main extends Application {
         stockChart.getStyleClass().addAll("card", "chart-content");
         stockChart.setPrefHeight(300);
 
-        panel.getChildren().addAll(titleBox, buttonBox, table, stockChart);
+        panel.getChildren().addAll(summaryBox, buttonBox, table, stockChart);
         return panel;
     }
 
     private void handleStockSelected(PortfolioItem item) {
         String symbol = item.getSymbol();
-        stockChart.setTitle("Loading " + symbol + "data...");
+        stockChart.setTitle("Loading " + symbol + " data...");
         stockChart.getData().clear();
 
         //Multi-Threading Displayed Below
@@ -463,9 +523,7 @@ public class Main extends Application {
             showAlert("Error", "Could not load chart data for " + symbol + ".");
         });
 
-        // New Thread
-
-        new Thread(loadChartTask).start();
+        executor.execute(loadChartTask);
 
     }
 
@@ -494,11 +552,26 @@ public class Main extends Application {
         }
     }
 
+    private VBox createStatCard(String title, Label valueLabel, Label subLabel) {
+        Label titleLabel = new Label(title);
+        titleLabel.getStyleClass().add("stat-title");
+
+        VBox card = new VBox(4);
+        card.getStyleClass().add("stat-card");
+        card.setMaxWidth(Double.MAX_VALUE);
+        card.getChildren().addAll(titleLabel, valueLabel);
+        if (subLabel != null) {
+            card.getChildren().add(subLabel);
+        }
+        return card;
+    }
+
     private <T> TableColumn<T, Double> createCurrencyColumn(String title, String propertyName, NumberFormat format) {
 
         TableColumn<T, Double> col = new TableColumn<>(title);
         col.setCellValueFactory(new PropertyValueFactory<>(propertyName));
         col.setPrefWidth(120);
+        col.setStyle("-fx-alignment: center-right;");
         col.setCellFactory(c -> new TableCell<T, Double>() {
 
             @Override
@@ -542,30 +615,14 @@ public class Main extends Application {
         NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
 
         totalValueLabel.setText(currencyFormat.format(totalValue));
+        totalPLLabel.setText((totalPL >= 0 ? "+" : "") + currencyFormat.format(totalPL));
+        totalPLPercentLabel.setText(String.format("%+.2f%%", plPercent));
+        totalInvestedLabel.setText(currencyFormat.format(totalInvested));
 
-        totalPLLabel.setText(currencyFormat.format(totalPL));
-
-        totalPLPercentLabel.setText(String.format("(%.2f%%)", plPercent));
-
-        totalInvestedLabel.setText(String.format("(Invested: %s)", currencyFormat.format(totalInvested)));
-        totalPLLabel.setText(currencyFormat.format(totalPL));
-
+        String plClass = (totalPL > 0) ? "pl-label-profit" : (totalPL < 0) ? "pl-label-loss" : "pl-label-zero";
         totalPLLabel.getStyleClass().removeAll("pl-label-profit", "pl-label-loss", "pl-label-zero");
         totalPLPercentLabel.getStyleClass().removeAll("pl-label-profit", "pl-label-loss", "pl-label-zero");
-
-
-        totalPLLabel.getStyleClass().removeAll("pl-label-profit", "pl-label-loss", "pl-label-zero");
-
-        if (totalPL > 0) {
-            totalPLLabel.getStyleClass().add("pl-label-profit");
-        } else if (totalPL < 0) {
-            totalPLLabel.getStyleClass().add("pl-label-loss");
-        } else {
-            totalPLLabel.getStyleClass().add("pl-label-zero");
-        }
-
-        totalInvestedLabel.setText(String.format("(Invested: %s)", currencyFormat.format(totalInvested)));
-
-        loadStockListData();
+        totalPLLabel.getStyleClass().add(plClass);
+        totalPLPercentLabel.getStyleClass().add(plClass);
     }
 }

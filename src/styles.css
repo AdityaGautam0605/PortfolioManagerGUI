@@ -1,269 +1,302 @@
+/* ============================================================
+   Portfolio Manager — design system
+   Re-theme the whole app by editing the palette in .root below.
+   (e.g. swap the dark values for light ones to flip themes.)
+   ============================================================ */
+
 .root {
-    -fx-background-color: #F5F7FA;
-    -fx-font-family: "Segoe UI";
+    /* ----- palette (swap these to re-theme) ----- */
+    -bg:             #0d1117;
+    -surface:        #161b22;
+    -surface-2:      #1c2531;
+    -border:         #2a3440;
+    -border-soft:    #202833;
+    -text:           #e6edf3;
+    -text-muted:     #8b98a5;
+    -accent:         #3b82f6;
+    -accent-hi:      #60a5fa;
+    -danger:         #f04747;
+    -danger-hi:      #f56b6b;
+    -positive:       #3fb950;
+    -negative:       #f85149;
+    -neutral-btn:    #262f3b;
+    -neutral-btn-hi: #313c4a;
+    -selected:       #1f3350;
+
+    -fx-background-color: -bg;
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-font-size: 13px;
 }
 
-.tab-header-background {
-    -fx-background-color: #E8EBED;
+.content-panel {
+    -fx-background-color: -bg;
 }
 
-.tab {
-    -fx-background-color: transparent;
-    -fx-text-fill: #6D6D6D;
-    -fx-padding: 8 14;
-}
-
-.tab:selected {
-    -fx-background-color: #FFFFFF;
-    -fx-text-fill: #000000;
-    -fx-border-color: #C2C8CC;
-    -fx-border-width: 0 0 2 0;
-}
-
+/* ---------- Typography ---------- */
 .label {
-    -fx-text-fill: #333333;
+    -fx-text-fill: -text;
 }
-
 .title-label {
-    -fx-font-size: 18px;
+    -fx-font-size: 20px;
     -fx-font-weight: bold;
-    -fx-text-fill: #111111;
+    -fx-text-fill: -text;
+}
+.total-value-label {
+    -fx-font-size: 32px;
+    -fx-font-weight: bold;
+    -fx-text-fill: -text;
+}
+.invested-label {
+    -fx-font-size: 13px;
+    -fx-text-fill: -text-muted;
 }
 
+/* ---------- Stat cards (summary) ---------- */
+.stat-card {
+    -fx-background-color: -surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -border;
+    -fx-border-radius: 12px;
+    -fx-padding: 14 18;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 4);
+}
+.stat-title {
+    -fx-text-fill: -text-muted;
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+}
+.stat-value {
+    -fx-text-fill: -text;
+    -fx-font-size: 24px;
+    -fx-font-weight: bold;
+}
+.stat-sub {
+    -fx-text-fill: -text-muted;
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+}
+
+/* ---------- Top toolbar (Buy/Sell) ---------- */
+.add-stock-panel {
+    -fx-background-color: -surface;
+    -fx-padding: 14 16;
+    -fx-background-radius: 10px;
+    -fx-border-color: -border;
+    -fx-border-radius: 10px;
+}
+
+/* ---------- Text fields ---------- */
 .text-field {
-    -fx-background-color: #FFFFFF;
-    -fx-text-fill: #333333;
-    -fx-padding: 6;
-    -fx-border-color: #C9D1D6;
-    -fx-border-radius: 4px;
-    -fx-background-radius: 4px;
+    -fx-background-color: -surface-2;
+    -fx-text-fill: -text;
+    -fx-prompt-text-fill: -text-muted;
+    -fx-padding: 8 10;
+    -fx-border-color: -border;
+    -fx-border-radius: 6px;
+    -fx-background-radius: 6px;
 }
-
 .text-field:focused {
-    -fx-border-color: #4A90E2;
+    -fx-border-color: -accent;
 }
 
+/* ---------- Buttons ---------- */
 .button {
     -fx-font-weight: bold;
-    -fx-background-radius: 4px;
-    -fx-padding: 6 12;
-    -fx-background-color: #E1E6EB;
-    -fx-text-fill: #333333;
-}
-
-.button:hover {
-    -fx-background-color: #D5DADF;
-}
-
-.buy-button {
-    -fx-background-color: #4A90E2;
-    -fx-text-fill: white;
-}
-
-.buy-button:hover {
-    -fx-background-color: #6AABF0;
-}
-
-.sell-button {
-    -fx-background-color: #E25454;
-    -fx-text-fill: white;
-}
-
-.sell-button:hover {
-    -fx-background-color: #F07575;
-}
-
-.update-button {
-    -fx-background-color: #AAB4BC;
-    -fx-text-fill: white;
-}
-
-.update-button:hover {
-    -fx-background-color: #C3CBD1;
-}
-
-.add-stock-panel {
-    -fx-background-color: #FFFFFF;
-    -fx-padding: 10;
-    -fx-border-color: #D3D8DC;
-    -fx-border-width: 0 0 1 0;
-}
-
-.table-view {
-
-    -fx-border-radius: 4px;
-    -fx-background-color: #3D3D3D;
-}
-
-.table-view .column-header-background {
-    -fx-background-color: #F1F3F5;
-}
-
-.table-view .column-header {
-    -fx-border-color: #78909C;
-
-    -fx-border-width: 0 0 1px 0;
-}
-
-.table-row-cell {
-    -fx-background-color: #FFFFFF;
-}
-
-.table-row-cell:odd {
-    -fx-background-color: #ffffff;
-}
-
-.table-row-cell:hover {
-    -fx-background-color: #E6EDF3;
-}
-
-.table-cell {
-    -fx-text-fill: #000000;
-    -fx-padding: 6;
-}
-
-.table-view .table-cell {
-    -fx-alignment: CENTER;
-}
-
-.chart-plot-background {
-    -fx-background-color: #FFFFFF;
-}
-
-.chart-horizontal-grid-lines,
-.chart-vertical-grid-lines {
-    -fx-stroke: #E1E6EB;
-}
-
-.axis {
-    -fx-tick-label-fill: #444444;
-}
-
-.axis-label {
-    -fx-text-fill: #555555;
-}
-
-.pl-label-profit {
-    -fx-text-fill: #2E7D32;
-}
-
-.pl-label-loss {
-    -fx-text-fill: #C62828;
-}
-
-.pl-label-zero {
-    -fx-text-fill: #111111;
-}
-
-.card {
-    -fx-background-color: #FFFFFF;
-    -fx-background-radius: 8px;
-    -fx-border-color: #D7DEE4;
-    -fx-border-radius: 8px;
-    -fx-padding: 16px;
-}
-
-.table-view {
-    -fx-background-insets: 0;
     -fx-background-radius: 6px;
-    -fx-border-radius: 6px;
+    -fx-padding: 8 16;
+    -fx-background-color: -neutral-btn;
+    -fx-text-fill: -text;
+    -fx-cursor: hand;
+}
+.button:hover {
+    -fx-background-color: -neutral-btn-hi;
+}
+.buy-button {
+    -fx-background-color: -accent;
+    -fx-text-fill: white;
+}
+.buy-button:hover {
+    -fx-background-color: -accent-hi;
+}
+.sell-button {
+    -fx-background-color: -danger;
+    -fx-text-fill: white;
+}
+.sell-button:hover {
+    -fx-background-color: -danger-hi;
+}
+.update-button {
+    -fx-background-color: -neutral-btn;
+    -fx-text-fill: -text;
+}
+.update-button:hover {
+    -fx-background-color: -neutral-btn-hi;
+}
+
+/* ---------- Cards ---------- */
+.card {
+    -fx-background-color: -surface;
+    -fx-background-radius: 12px;
+    -fx-border-color: -border;
+    -fx-border-radius: 12px;
+    -fx-padding: 4px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 4);
+}
+.chart-content {
+    -fx-background-color: -surface;
+    -fx-padding: 12px;
+    -fx-background-radius: 12px;
+    -fx-border-color: -border;
+    -fx-border-radius: 12px;
+    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 4);
+}
+
+/* ---------- Profit / Loss labels ---------- */
+.pl-label-profit { -fx-text-fill: -positive; -fx-font-weight: bold; }
+.pl-label-loss   { -fx-text-fill: -negative; -fx-font-weight: bold; }
+.pl-label-zero   { -fx-text-fill: -text-muted; -fx-font-weight: bold; }
+
+/* ---------- Tabs ---------- */
+.tab-pane {
+    -fx-background-color: -bg;
+}
+.tab-header-background {
+    -fx-background-color: -bg;
+}
+.tab-pane .tab-header-area {
+    -fx-padding: 6 8 0 8;
+}
+.tab {
+    -fx-background-color: transparent;
+    -fx-padding: 8 18;
+    -fx-background-radius: 8 8 0 0;
+}
+.tab .tab-label {
+    -fx-text-fill: -text-muted;
+    -fx-font-weight: bold;
+}
+.tab:hover {
+    -fx-background-color: -surface-2;
+}
+.tab:selected {
+    -fx-background-color: -surface;
+    -fx-border-color: -accent;
+    -fx-border-width: 0 0 2 0;
+}
+.tab:selected .tab-label {
+    -fx-text-fill: -text;
+}
+.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
     -fx-border-color: transparent;
 }
 
+/* ---------- Tables ---------- */
+.table-view {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-padding: 0;
+}
 .table-view .column-header-background {
-    -fx-background-radius: 6px 6px 0 0;
+    -fx-background-color: -surface-2;
+    -fx-background-radius: 8 8 0 0;
 }
-
-.chart-content {
-    -fx-background-color: #FFFFFF;
-    -fx-padding: 16px;
-    -fx-background-radius: 8px;
-    -fx-border-color: #D7DEE4;
-    -fx-border-radius: 8px;
+.table-view .column-header {
+    -fx-background-color: transparent;
+    -fx-border-color: -border;
+    -fx-border-width: 0 0 1 0;
+    -fx-padding: 10 8;
 }
-
-.total-value-label {
-    -fx-font-size: 28px;
+.table-view .column-header .label {
+    -fx-text-fill: -text-muted;
     -fx-font-weight: bold;
-    -fx-text-fill: #000000;
-
-}
-
-.invested-label {
-    -fx-font-size: 14px;
-    -fx-font-weight: normal;
-    -fx-text-fill: #BDBDBD;
-
-}
-
-.table-view .table-cell {
+    -fx-font-size: 12px;
     -fx-alignment: CENTER;
-    -fx-border-color: #d1dada;
-
 }
-
+.table-view .table-row-cell {
+    -fx-background-color: -surface;
+    -fx-border-color: transparent transparent -border-soft transparent;
+    -fx-table-cell-border-color: transparent;
+    -fx-cell-size: 38px;
+}
+.table-view .table-row-cell:hover {
+    -fx-background-color: -surface-2;
+}
+.table-view .table-row-cell:selected {
+    -fx-background-color: -selected;
+}
+.table-view .table-row-cell:selected .table-cell {
+    -fx-text-fill: -text;
+}
+.table-view .table-row-cell:empty {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+}
+.table-view .table-cell {
+    -fx-text-fill: -text;
+    -fx-alignment: center-left;
+    -fx-padding: 6 10;
+    -fx-border-color: transparent;
+}
 .table-view .placeholder .label {
-    -fx-text-fill: #dbd6d6;
-
+    -fx-text-fill: -text-muted;
 }
 
-.table-view .scroll-bar {
-    -fx-background-color: #3D3D3D;
-
+/* scrollbars */
+.table-view .scroll-bar:vertical,
+.table-view .scroll-bar:horizontal {
+    -fx-background-color: transparent;
 }
-
 .table-view .scroll-bar .thumb {
-    -fx-background-color: #546E7A;
-
-    -fx-background-radius: 4px;
+    -fx-background-color: -border;
+    -fx-background-radius: 6px;
 }
-
 .table-view .scroll-bar .thumb:hover {
-    -fx-background-color: #78909C;
+    -fx-background-color: -text-muted;
 }
-
 .table-view .scroll-bar .increment-button,
 .table-view .scroll-bar .decrement-button {
     -fx-background-color: transparent;
     -fx-padding: 0;
 }
-
 .table-view .scroll-bar .increment-arrow,
 .table-view .scroll-bar .decrement-arrow {
     -fx-shape: "";
     -fx-padding: 0;
 }
 
-.table-view .column-header {
-    -fx-background-color: #7bb2cd;
-
-    -fx-font-weight: bold;
+/* ---------- Chart ---------- */
+.chart {
+    -fx-padding: 6px;
+}
+.chart-title {
+    -fx-text-fill: -text;
     -fx-font-size: 14px;
-
-
-    -fx-border-color: #546E7A;
-
-    -fx-border-width: 0 1px 1px 0;
-
+    -fx-font-weight: bold;
 }
-
-.table-view .column-header .label {
-    -fx-text-fill: #FFFFFF;
-
+.chart-plot-background {
+    -fx-background-color: transparent;
 }
-
-.tab {
-    display: inline-block;
-    padding: 8px 16px;
-    margin-right: 8px;
-    border: none;
-    background: none;
+.chart-horizontal-grid-lines,
+.chart-vertical-grid-lines {
+    -fx-stroke: -border-soft;
 }
-
-.tab {
-    display: inline-block;
-    padding: 8px 16px;
-    margin-right: 8px;
-    border: none;
-    background: none;
+.chart-alternative-row-fill {
+    -fx-fill: transparent;
+}
+.axis {
+    -fx-tick-label-fill: -text-muted;
+    -fx-font-size: 11px;
+}
+.axis-label {
+    -fx-text-fill: -text-muted;
+}
+.default-color0.chart-series-line {
+    -fx-stroke: -accent;
+    -fx-stroke-width: 2px;
+}
+.chart-legend {
+    -fx-background-color: transparent;
+}
+.chart-legend-item {
+    -fx-text-fill: -text-muted;
 }

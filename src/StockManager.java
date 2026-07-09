@@ -3,6 +3,7 @@ import javafx.collections.*;
 
 import java.sql.*;
 import java.util.*;
+import java.util.concurrent.*;
 
 public class StockManager {
 
@@ -31,29 +32,11 @@ public class StockManager {
                 System.out.println("Stored/Updated stock: " + data.getName() + "(" + symbol + ")");
             }
         } catch (Exception e) {
-            System.out.println("Error int storeLiveStock for symbol: " + data.getName() + "(" + symbol + ")");
+            System.out.println("Error in storeLiveStock for symbol: " + symbol);
             e.printStackTrace();
         }
 
 
-    }
-
-    public void viewStocks() {
-        String query = "SELECT * FROM stocks";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement((query));
-             ResultSet rs = stmt.executeQuery()) {
-
-
-            while (rs.next()) {
-                System.out.println(rs.getString("name") + "(" + rs.getString("symbol") + "): $" + rs.getDouble("price"));
-            }
-
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
     }
 
     public void addToPortfolio(String symbol, int quantity, double buyPrice) {
@@ -148,8 +131,7 @@ public class StockManager {
                 if (rs.next()) {
                     price = rs.getDouble("price");
                 } else {
-                    System.out.println("Error: portfolioManagerGUI.Stock symbol '" + symbol + "' not found in your 'stocks' list.");
-                    System.out.println("Please add the stock using Option 1 before adding it to your portfolio.");
+                    System.out.println("Stock symbol '" + symbol + "' not found in the stocks table.");
                 }
             }
 
@@ -186,16 +168,32 @@ public class StockManager {
                 return;
             }
 
-            for (String symbol : symbols) {
-
-                System.out.println("Updating price for: " + symbol);
-                updateStockPrice(symbol);
+            // Fetch prices concurrently on a bounded pool: turns the batch from
+            // N * latency (sequential) into roughly ceil(N / poolSize) * latency,
+            // while capping concurrency so we don't exhaust threads or hit API rate limits.
+            int poolSize = Math.min(4, symbols.size());
+            ExecutorService pool = Executors.newFixedThreadPool(poolSize);
+            try {
+                List<Callable<Void>> tasks = new ArrayList<>();
+                for (String symbol : symbols) {
+                    tasks.add(() -> {
+                        System.out.println("Updating price for: " + symbol);
+                        updateStockPrice(symbol);
+                        return null;
+                    });
+                }
+                pool.invokeAll(tasks); // blocks until every price has been updated
+            } finally {
+                pool.shutdown();
             }
 
             System.out.println("All stock prices updated.");
         } catch (SQLException e) {
             System.out.println("A database error occurred while getting stock symbols. ");
             e.printStackTrace();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            System.out.println("Price update was interrupted.");
         }
     }
 

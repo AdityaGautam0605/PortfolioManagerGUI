@@ -42,7 +42,8 @@ public final class Config {
 
         String env = System.getenv(envKey);
         if (env != null && !env.isBlank()) {
-            return env;
+            // trim() guards against stray spaces from IDE run-config / shell env values.
+            return env.trim();
         }
 
         String value = FILE_PROPS.getProperty(key);
@@ -52,6 +53,6 @@ public final class Config {
                             + "(copy from config.properties.example) or as the env var "
                             + envKey + ".");
         }
-        return value;
+        return value.trim();
     }
 }
