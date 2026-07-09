@@ -5,11 +5,12 @@
 #
 # config.properties is git-ignored so your real secrets never get committed.
 # Any value here can also be supplied via an environment variable, which takes
-# priority (db.password -> DB_PASSWORD, finnhub.api.key -> FINNHUB_API_KEY, ...).
+# priority (db.password -> DB_PASSWORD, etc.).
+#
+# The API keys are read from environment variables, NOT from this file. Set:
+#     FINNHUB_API_KEY        - your Finnhub API key
+#     ALPHAVANTAGE_API_KEY   - your Alpha Vantage API key
 
 db.url=jdbc:mysql://127.0.0.1:3306/portfolioManagerDB
 db.user=your_mysql_user
 db.password=your_mysql_password
-
-finnhub.api.key=your_finnhub_api_key
-alphavantage.api.key=your_alphavantage_api_key
