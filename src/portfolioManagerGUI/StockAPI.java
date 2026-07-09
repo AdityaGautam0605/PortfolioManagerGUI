@@ -11,8 +11,8 @@ import java.util.Iterator;
 
 public class StockAPI {
 
-    private static final String alphaVantageApiKey = "***REMOVED***";
-    private static final String finnhubApiKey = "***REMOVED***";
+    private static final String alphaVantageApiKey = Config.get("alphavantage.api.key");
+    private static final String finnhubApiKey = Config.get("finnhub.api.key");
 
 
     public static StockData getStockData(String symbol) {

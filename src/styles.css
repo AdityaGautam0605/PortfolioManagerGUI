@@ -1,9 +1,6 @@
-.root,
-.tab-pane,
-.content-panel {
-    -fx-background-color: #F4F6F8;
-    -fx-font-family: "Segoe UI", Arial, sans-serif;
-    -fx-text-fill: #333333;
+.root {
+    -fx-background-color: #F5F7FA;
+    -fx-font-family: "Segoe UI";
 }
 
 .tab-header-background {
@@ -263,9 +260,10 @@
     background: none;
 }
 
-.tab.active {
-    m-background: #fff;
-    border-bottom: 2px solid #ffffff;
-    box-shadow: none;
-    z-index: 1;
+.tab {
+    display: inline-block;
+    padding: 8px 16px;
+    margin-right: 8px;
+    border: none;
+    background: none;
 }
