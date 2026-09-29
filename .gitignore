@@ -31,3 +31,10 @@ bin/
 
 ### Local secrets — never commit ###
 config.properties
+
+### Web UI ###
+node_modules/
+.npm-cache/
+web/dist/
+web/test-results/
+web/playwright-report/

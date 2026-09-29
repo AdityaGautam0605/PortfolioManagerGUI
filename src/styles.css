@@ -1,302 +1,123 @@
-/* ============================================================
-   Portfolio Manager — design system
-   Re-theme the whole app by editing the palette in .root below.
-   (e.g. swap the dark values for light ones to flip themes.)
-   ============================================================ */
-
+/* Shared palette for the dashboard and its dialogs. */
 .root {
-    /* ----- palette (swap these to re-theme) ----- */
-    -bg:             #0d1117;
-    -surface:        #161b22;
-    -surface-2:      #1c2531;
-    -border:         #2a3440;
-    -border-soft:    #202833;
-    -text:           #e6edf3;
-    -text-muted:     #8b98a5;
-    -accent:         #3b82f6;
-    -accent-hi:      #60a5fa;
-    -danger:         #f04747;
-    -danger-hi:      #f56b6b;
-    -positive:       #3fb950;
-    -negative:       #f85149;
-    -neutral-btn:    #262f3b;
-    -neutral-btn-hi: #313c4a;
-    -selected:       #1f3350;
-
+    -bg: #fafafa;
+    -surface: #ffffff;
+    -surface-2: #f4f4f5;
+    -border: #e4e4e7;
+    -text: #18181b;
+    -muted: #71717a;
+    -accent: #18181b;
+    -positive: #15803d;
+    -negative: #be123c;
     -fx-background-color: -bg;
-    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-font-family: "Segoe UI";
     -fx-font-size: 13px;
+    -fx-focus-color: #71717a;
+    -fx-faint-focus-color: transparent;
 }
-
-.content-panel {
-    -fx-background-color: -bg;
-}
-
-/* ---------- Typography ---------- */
-.label {
-    -fx-text-fill: -text;
-}
-.title-label {
-    -fx-font-size: 20px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -text;
-}
-.total-value-label {
-    -fx-font-size: 32px;
-    -fx-font-weight: bold;
-    -fx-text-fill: -text;
-}
-.invested-label {
-    -fx-font-size: 13px;
-    -fx-text-fill: -text-muted;
-}
-
-/* ---------- Stat cards (summary) ---------- */
-.stat-card {
+.label { -fx-text-fill: -text; }
+.muted, .stat-sub { -fx-text-fill: -muted; -fx-font-size: 12px; }
+.eyebrow { -fx-text-fill: -muted; -fx-font-size: 10px; -fx-font-weight: bold; }
+.page-title { -fx-font-size: 30px; -fx-font-weight: bold; }
+.section-title { -fx-font-size: 15px; -fx-font-weight: bold; }
+.field-label { -fx-text-fill: -muted; -fx-font-size: 12px; }
+.app-header { -fx-padding: 24 28 20 28; }
+.page-content { -fx-padding: 22 28 28 28; -fx-background-color: -bg; }
+.stat-card, .card-panel {
     -fx-background-color: -surface;
-    -fx-background-radius: 12px;
     -fx-border-color: -border;
-    -fx-border-radius: 12px;
-    -fx-padding: 14 18;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 4);
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 20;
 }
-.stat-title {
-    -fx-text-fill: -text-muted;
-    -fx-font-size: 11px;
-    -fx-font-weight: bold;
-}
-.stat-value {
-    -fx-text-fill: -text;
-    -fx-font-size: 24px;
-    -fx-font-weight: bold;
-}
-.stat-sub {
-    -fx-text-fill: -text-muted;
-    -fx-font-size: 13px;
-    -fx-font-weight: bold;
-}
-
-/* ---------- Top toolbar (Buy/Sell) ---------- */
-.add-stock-panel {
-    -fx-background-color: -surface;
-    -fx-padding: 14 16;
-    -fx-background-radius: 10px;
-    -fx-border-color: -border;
-    -fx-border-radius: 10px;
-}
-
-/* ---------- Text fields ---------- */
-.text-field {
+.stat-value { -fx-font-size: 28px; -fx-font-weight: bold; }
+.label.profit, .table-cell.profit { -fx-text-fill: -positive; }
+.label.loss, .table-cell.loss { -fx-text-fill: -negative; }
+.button {
     -fx-background-color: -surface-2;
     -fx-text-fill: -text;
-    -fx-prompt-text-fill: -text-muted;
-    -fx-padding: 8 10;
-    -fx-border-color: -border;
-    -fx-border-radius: 6px;
-    -fx-background-radius: 6px;
-}
-.text-field:focused {
-    -fx-border-color: -accent;
-}
-
-/* ---------- Buttons ---------- */
-.button {
     -fx-font-weight: bold;
-    -fx-background-radius: 6px;
-    -fx-padding: 8 16;
-    -fx-background-color: -neutral-btn;
-    -fx-text-fill: -text;
+    -fx-padding: 10 16;
+    -fx-background-radius: 7;
+    -fx-border-radius: 7;
+    -fx-border-color: transparent;
     -fx-cursor: hand;
 }
-.button:hover {
-    -fx-background-color: -neutral-btn-hi;
-}
-.buy-button {
-    -fx-background-color: -accent;
-    -fx-text-fill: white;
-}
-.buy-button:hover {
-    -fx-background-color: -accent-hi;
-}
-.sell-button {
-    -fx-background-color: -danger;
-    -fx-text-fill: white;
-}
-.sell-button:hover {
-    -fx-background-color: -danger-hi;
-}
-.update-button {
-    -fx-background-color: -neutral-btn;
-    -fx-text-fill: -text;
-}
-.update-button:hover {
-    -fx-background-color: -neutral-btn-hi;
-}
-
-/* ---------- Cards ---------- */
-.card {
-    -fx-background-color: -surface;
-    -fx-background-radius: 12px;
-    -fx-border-color: -border;
-    -fx-border-radius: 12px;
-    -fx-padding: 4px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 4);
-}
-.chart-content {
-    -fx-background-color: -surface;
-    -fx-padding: 12px;
-    -fx-background-radius: 12px;
-    -fx-border-color: -border;
-    -fx-border-radius: 12px;
-    -fx-effect: dropshadow(gaussian, rgba(0, 0, 0, 0.35), 14, 0, 0, 4);
-}
-
-/* ---------- Profit / Loss labels ---------- */
-.pl-label-profit { -fx-text-fill: -positive; -fx-font-weight: bold; }
-.pl-label-loss   { -fx-text-fill: -negative; -fx-font-weight: bold; }
-.pl-label-zero   { -fx-text-fill: -text-muted; -fx-font-weight: bold; }
-
-/* ---------- Tabs ---------- */
-.tab-pane {
+.button:hover { -fx-background-color: #e4e4e7; }
+.button:focused { -fx-border-color: -accent; }
+.button:disabled { -fx-opacity: 0.5; }
+.primary-button { -fx-background-color: -accent; -fx-text-fill: #fafafa; }
+.primary-button:hover { -fx-background-color: #3f3f46; }
+.sell-button { -fx-background-color: #ffffff; -fx-text-fill: #be123c; }
+.sell-button:hover { -fx-background-color: #fff1f2; }
+.text-field, .text-area {
     -fx-background-color: -bg;
-}
-.tab-header-background {
-    -fx-background-color: -bg;
-}
-.tab-pane .tab-header-area {
-    -fx-padding: 6 8 0 8;
-}
-.tab {
-    -fx-background-color: transparent;
-    -fx-padding: 8 18;
-    -fx-background-radius: 8 8 0 0;
-}
-.tab .tab-label {
-    -fx-text-fill: -text-muted;
-    -fx-font-weight: bold;
-}
-.tab:hover {
-    -fx-background-color: -surface-2;
-}
-.tab:selected {
-    -fx-background-color: -surface;
-    -fx-border-color: -accent;
-    -fx-border-width: 0 0 2 0;
-}
-.tab:selected .tab-label {
     -fx-text-fill: -text;
+    -fx-prompt-text-fill: -muted;
+    -fx-border-color: -border;
+    -fx-border-radius: 7;
+    -fx-background-radius: 7;
+    -fx-padding: 10 12;
+    -fx-highlight-fill: #d4d4d8;
 }
-.tab-pane:focused > .tab-header-area > .headers-region > .tab:selected .focus-indicator {
-    -fx-border-color: transparent;
-}
-
-/* ---------- Tables ---------- */
+.text-field:focused { -fx-border-color: -accent; }
+.text-area .content { -fx-background-color: -bg; }
+.scroll-pane, .scroll-pane > .viewport { -fx-background-color: -bg; -fx-padding: 0; }
+.scroll-bar { -fx-background-color: transparent; }
+.scroll-bar .thumb { -fx-background-color: -border; -fx-background-radius: 6; }
+.scroll-bar .thumb:hover { -fx-background-color: -muted; }
+.scroll-bar .increment-button, .scroll-bar .decrement-button { -fx-background-color: transparent; }
+.tab-pane .tab-header-area { -fx-padding: 0 28 0 28; }
+.tab-header-background { -fx-background-color: -bg; -fx-border-color: -border; -fx-border-width: 0 0 1 0; }
+.tab { -fx-background-color: transparent; -fx-padding: 10 20; -fx-border-width: 0 0 2 0; -fx-border-color: transparent; }
+.tab .tab-label { -fx-text-fill: -muted; -fx-font-weight: bold; }
+.tab:selected { -fx-border-color: -accent; }
+.tab:selected .tab-label { -fx-text-fill: -text; }
+.tab:hover { -fx-background-color: -surface; }
 .table-view {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-    -fx-padding: 0;
-}
-.table-view .column-header-background {
-    -fx-background-color: -surface-2;
-    -fx-background-radius: 8 8 0 0;
-}
-.table-view .column-header {
-    -fx-background-color: transparent;
-    -fx-border-color: -border;
-    -fx-border-width: 0 0 1 0;
-    -fx-padding: 10 8;
-}
-.table-view .column-header .label {
-    -fx-text-fill: -text-muted;
-    -fx-font-weight: bold;
-    -fx-font-size: 12px;
-    -fx-alignment: CENTER;
-}
-.table-view .table-row-cell {
     -fx-background-color: -surface;
-    -fx-border-color: transparent transparent -border-soft transparent;
-    -fx-table-cell-border-color: transparent;
-    -fx-cell-size: 38px;
+    -fx-border-color: -border;
+    -fx-border-radius: 8;
+    -fx-background-radius: 8;
+    -fx-padding: 1;
 }
-.table-view .table-row-cell:hover {
-    -fx-background-color: -surface-2;
-}
-.table-view .table-row-cell:selected {
-    -fx-background-color: -selected;
-}
-.table-view .table-row-cell:selected .table-cell {
-    -fx-text-fill: -text;
-}
-.table-view .table-row-cell:empty {
-    -fx-background-color: transparent;
-    -fx-border-color: transparent;
-}
-.table-view .table-cell {
-    -fx-text-fill: -text;
-    -fx-alignment: center-left;
-    -fx-padding: 6 10;
-    -fx-border-color: transparent;
-}
-.table-view .placeholder .label {
-    -fx-text-fill: -text-muted;
-}
+.table-view .column-header-background { -fx-background-color: -surface-2; }
+.table-view .column-header { -fx-background-color: transparent; -fx-padding: 11 10; }
+.table-view .column-header .label { -fx-text-fill: -muted; -fx-alignment: CENTER_LEFT; -fx-font-size: 12px; }
+.table-view .filler { -fx-background-color: -surface-2; }
+.table-row-cell { -fx-background-color: -surface; -fx-cell-size: 44; }
+.table-row-cell:odd { -fx-background-color: #fafafa; }
+.table-row-cell:hover { -fx-background-color: #f4f4f5; }
+.table-row-cell:selected { -fx-background-color: #e4e4e7; }
+.table-row-cell:empty { -fx-background-color: -surface; }
+.table-cell { -fx-text-fill: -text; -fx-padding: 10 12; -fx-border-color: transparent; -fx-alignment: CENTER_LEFT; }
+.table-view .placeholder .label { -fx-text-fill: -muted; }
+.chart { -fx-padding: 8 0 0 0; }
+.chart-plot-background { -fx-background-color: transparent; }
+.chart-horizontal-grid-lines { -fx-stroke: -border; }
+.chart-vertical-grid-lines { -fx-stroke: transparent; }
+.chart-alternative-row-fill { -fx-fill: transparent; }
+.axis { -fx-tick-label-fill: -muted; -fx-font-size: 10px; }
+.axis-label { -fx-text-fill: -muted; }
+.default-color0.chart-series-line { -fx-stroke: -accent; -fx-stroke-width: 2.5; }
+.status-bar { -fx-padding: 12 28; -fx-background-color: -surface; -fx-border-color: -border; -fx-border-width: 1 0 0 0; }
+.status-badge { -fx-font-size: 10px; -fx-font-weight: bold; -fx-padding: 5 8; -fx-background-radius: 5; }
+.status-badge.success { -fx-background-color: #f0fdf4; -fx-text-fill: -positive; }
+.status-badge.working { -fx-background-color: #f4f4f5; -fx-text-fill: #3f3f46; }
+.status-badge.warning { -fx-background-color: #fffbeb; -fx-text-fill: #92400e; }
+.status-badge.error { -fx-background-color: #fff1f2; -fx-text-fill: -negative; }
+.progress-bar { -fx-accent: -accent; }
+.progress-bar .track { -fx-background-color: -surface-2; -fx-background-radius: 4; }
+.progress-bar .bar { -fx-background-radius: 4; -fx-padding: 3; }
+.progress-indicator { -fx-progress-color: -accent; }
+.context-menu { -fx-background-color: -surface-2; -fx-padding: 5; }
+.menu-item:focused { -fx-background-color: #e4e4e7; }
+.menu-item .label { -fx-text-fill: -text; }
+.dialog-pane { -fx-background-color: -surface; }
+.dialog-pane > .header-panel { -fx-background-color: -surface-2; }
+.dialog-pane > .button-bar > .container { -fx-background-color: -surface; }
 
-/* scrollbars */
-.table-view .scroll-bar:vertical,
-.table-view .scroll-bar:horizontal {
-    -fx-background-color: transparent;
-}
-.table-view .scroll-bar .thumb {
-    -fx-background-color: -border;
-    -fx-background-radius: 6px;
-}
-.table-view .scroll-bar .thumb:hover {
-    -fx-background-color: -text-muted;
-}
-.table-view .scroll-bar .increment-button,
-.table-view .scroll-bar .decrement-button {
-    -fx-background-color: transparent;
-    -fx-padding: 0;
-}
-.table-view .scroll-bar .increment-arrow,
-.table-view .scroll-bar .decrement-arrow {
-    -fx-shape: "";
-    -fx-padding: 0;
-}
-
-/* ---------- Chart ---------- */
-.chart {
-    -fx-padding: 6px;
-}
-.chart-title {
-    -fx-text-fill: -text;
-    -fx-font-size: 14px;
-    -fx-font-weight: bold;
-}
-.chart-plot-background {
-    -fx-background-color: transparent;
-}
-.chart-horizontal-grid-lines,
-.chart-vertical-grid-lines {
-    -fx-stroke: -border-soft;
-}
-.chart-alternative-row-fill {
-    -fx-fill: transparent;
-}
-.axis {
-    -fx-tick-label-fill: -text-muted;
-    -fx-font-size: 11px;
-}
-.axis-label {
-    -fx-text-fill: -text-muted;
-}
-.default-color0.chart-series-line {
-    -fx-stroke: -accent;
-    -fx-stroke-width: 2px;
-}
-.chart-legend {
-    -fx-background-color: transparent;
-}
-.chart-legend-item {
-    -fx-text-fill: -text-muted;
-}
+.secondary-button, .sell-button { -fx-border-color: -border; -fx-background-color: -surface; }
+.secondary-button:hover { -fx-background-color: -surface-2; }
+.sell-button:hover { -fx-background-color: #fff1f2; }
+.table-view:focused { -fx-border-color: #a1a1aa; }

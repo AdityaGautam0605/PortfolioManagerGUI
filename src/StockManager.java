@@ -1,340 +1,175 @@
 import portfolioManagerGUI.*;
 import javafx.collections.*;
-
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.*;
 
 public class StockManager {
+    @FunctionalInterface
+    interface ConnectionProvider { Connection open() throws SQLException; }
+    private final ConnectionProvider connections;
+    private final Function<String, StockData> stockData;
+    private final ToDoubleFunction<String> quotes;
 
-    public void storeLiveStock(String symbol) {
-        StockData data = null;
-        try {
-            data = StockAPI.getStockData(symbol);
-
-            if (data.getPrice() == -1.0) {
-                System.out.println("Could not fetch data for " + symbol + ". Stock not added/updated");
-                return;
-            }
-
-            String sql = "INSERT INTO stocks (symbol, name, price) VALUES (?, ?, ?) " +
-                    "ON DUPLICATE KEY UPDATE name = VALUES(name), price = VALUES(price)";
-
-
-            try (Connection conn = DatabaseConnection.getConnection();
-                 PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-                stmt.setString(1, symbol);
-                stmt.setString(2, data.getName());
-                stmt.setDouble(3, data.getPrice());
-                stmt.executeUpdate();
-
-                System.out.println("Stored/Updated stock: " + data.getName() + "(" + symbol + ")");
-            }
-        } catch (Exception e) {
-            System.out.println("Error in storeLiveStock for symbol: " + symbol);
-            e.printStackTrace();
-        }
-
-
+    public StockManager() {
+        this(DatabaseConnection::getConnection, StockAPI::getStockData, StockAPI::getLivePrice);
     }
 
-    public void addToPortfolio(String symbol, int quantity, double buyPrice) {
+    StockManager(ConnectionProvider connections, Function<String, StockData> stockData,
+                 ToDoubleFunction<String> quotes) {
+        this.connections = connections;
+        this.stockData = stockData;
+        this.quotes = quotes;
+    }
 
-        String query = "INSERT INTO portfolio (symbol, quantity, buy_price) VALUES (?, ?, ?)";
+    /** Return the fetched price only after the stock has been saved. */
+    public double storeLiveStock(String symbol) throws SQLException {
+        StockData data = stockData.apply(symbol);
+        requirePrice(data.getPrice(), symbol);
+        String sql = "INSERT INTO stocks (symbol, name, price) VALUES (?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE name = VALUES(name), price = VALUES(price), last_updated = NOW()";
+        try (Connection conn = connections.open(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, symbol);
+            stmt.setString(2, data.getName());
+            stmt.setDouble(3, data.getPrice());
+            stmt.executeUpdate();
+        }
+        return data.getPrice();
+    }
 
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
+    public void addToPortfolio(String symbol, int quantity, double buyPrice) throws SQLException {
+        requirePrice(buyPrice, symbol);
+        if (quantity == 0) throw new OperationException("Quantity cannot be zero.");
+        try (Connection conn = connections.open(); PreparedStatement stmt = conn.prepareStatement(
+                "INSERT INTO portfolio (symbol, quantity, buy_price) VALUES (?, ?, ?)")) {
             stmt.setString(1, symbol);
             stmt.setInt(2, quantity);
             stmt.setDouble(3, buyPrice);
-            stmt.executeUpdate();
-
-            System.out.println("Added to portfolio: " + symbol + "(" + quantity + "@ $" + buyPrice + ")");
-
-        } catch (SQLException e) {
-            e.printStackTrace();
+            if (stmt.executeUpdate() != 1) throw new SQLException("Portfolio entry was not saved.");
         }
     }
 
-    public ObservableList<PortfolioItem> getPortfolioOverview() {
+    private static final String POSITIONS = """
+            SELECT p.symbol, s.price AS current_price, SUM(p.quantity) AS total_quantity,
+                   SUM(p.quantity * p.buy_price) / NULLIF(SUM(p.quantity), 0) AS average_buy_price,
+                   SUM((s.price - p.buy_price) * p.quantity) AS total_profit_loss
+            FROM portfolio p JOIN stocks s ON p.symbol = s.symbol
+            """;
 
-        ObservableList<PortfolioItem> portfolio = FXCollections.observableArrayList();
-
-        String query = """
-                SELECT 
-                    p.symbol,
-                    s.price AS current_price,
-                    SUM(p.quantity) AS total_quantity,
-                    SUM(p.quantity * p.buy_price) / SUM(p.quantity) AS average_buy_price,
-                    SUM((s.price - p.buy_price) * p.quantity) AS total_profit_loss
-                FROM 
-                    portfolio p
-                JOIN 
-                    stocks s ON p.symbol = s.symbol
-                GROUP BY 
-                    p.symbol, s.price;
-                """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
+    public ObservableList<PortfolioItem> getPortfolioOverview() throws SQLException {
+        ObservableList<PortfolioItem> result = FXCollections.observableArrayList();
+        try (Connection conn = connections.open(); PreparedStatement stmt = conn.prepareStatement(POSITIONS +
+                " GROUP BY p.symbol, s.price HAVING SUM(p.quantity) > 0 ORDER BY p.symbol");
              ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                String symbol = rs.getString("symbol");
-                int qty = rs.getInt("total_quantity");
-                double buy = rs.getDouble("average_buy_price");
-                double live = rs.getDouble("current_price");
-                double pl = rs.getDouble("total_profit_loss");
-
-                portfolio.add(new PortfolioItem(symbol, qty, buy, live, pl));
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
+            while (rs.next()) result.add(readPosition(rs));
         }
-
-        return portfolio;
+        return result;
     }
 
-    public void updateStockPrice(String symbol) {
-        double newPrice = StockAPI.getLivePrice(symbol);
-        if (newPrice <= 0) {
-            System.out.println("Failed to update " + symbol);
-            return;
-        }
-
-        String sql = "UPDATE stocks SET price = ?, last_updated = NOW() WHERE symbol = ?";
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-
-            stmt.setDouble(1, newPrice);
-            stmt.setString(2, symbol);
-            stmt.executeUpdate();
-
-            System.out.println("Updated " + symbol + " → $" + newPrice);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public double getPriceFromDB(String symbol) {
-        String query = "SELECT price FROM stocks WHERE symbol = ?";
-        double price = -1.0;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
+    public PortfolioItem getPortfolioPosition(String symbol) throws SQLException {
+        try (Connection conn = connections.open(); PreparedStatement stmt = conn.prepareStatement(POSITIONS +
+                " WHERE p.symbol = ? GROUP BY p.symbol, s.price HAVING SUM(p.quantity) > 0")) {
             stmt.setString(1, symbol);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    price = rs.getDouble("price");
-                } else {
-                    System.out.println("Stock symbol '" + symbol + "' not found in the stocks table.");
-                }
-            }
-
-
-        } catch (SQLException e) {
-            System.out.println("Database error while fetching price.");
-            e.printStackTrace();
+            try (ResultSet rs = stmt.executeQuery()) { return rs.next() ? readPosition(rs) : null; }
         }
-        return price;
+    }
+
+    private PortfolioItem readPosition(ResultSet rs) throws SQLException {
+        return new PortfolioItem(rs.getString("symbol"), rs.getInt("total_quantity"),
+                rs.getDouble("average_buy_price"), rs.getDouble("current_price"), rs.getDouble("total_profit_loss"));
+    }
+
+    public ObservableList<StockItem> getAllStocks() throws SQLException {
+        ObservableList<StockItem> result = FXCollections.observableArrayList();
+        String query = """
+                SELECT s.symbol, s.name, s.price, COALESCE(SUM(p.quantity), 0) > 0 AS is_holding
+                FROM stocks s LEFT JOIN portfolio p ON s.symbol = p.symbol
+                GROUP BY s.symbol, s.name, s.price ORDER BY s.name
+                """;
+        try (Connection conn = connections.open(); PreparedStatement stmt = conn.prepareStatement(query);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) result.add(new StockItem(rs.getString("symbol"), rs.getString("name"),
+                    rs.getDouble("price"), rs.getBoolean("is_holding")));
+        }
+        return result;
+    }
+
+    public void updateStockPrice(String symbol) throws SQLException {
+        double price = quotes.applyAsDouble(symbol);
+        requirePrice(price, symbol);
+        try (Connection conn = connections.open(); PreparedStatement stmt = conn.prepareStatement(
+                "UPDATE stocks SET price = ?, last_updated = NOW() WHERE symbol = ?")) {
+            stmt.setDouble(1, price);
+            stmt.setString(2, symbol);
+            if (stmt.executeUpdate() == 0)
+                throw new OperationException("No stock was updated for " + symbol + ". Reload the stock list.");
+        }
     }
 
     private List<String> getAllStockSymbols() throws SQLException {
         List<String> symbols = new ArrayList<>();
-        String query = "SELECT symbol FROM stocks";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
+        try (Connection conn = connections.open();
+             PreparedStatement stmt = conn.prepareStatement("SELECT symbol FROM stocks ORDER BY symbol");
              ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                symbols.add(rs.getString("symbol"));
-            }
+            while (rs.next()) symbols.add(rs.getString("symbol"));
         }
         return symbols;
     }
 
-    public void updateAllStockPrices() {
-        System.out.println("Starting update for all stock prices...");
+    public record PriceUpdateResult(int total, int updated, Map<String, String> failures) {
+        public PriceUpdateResult { failures = Collections.unmodifiableMap(new LinkedHashMap<>(failures)); }
+    }
+    private record QuoteResult(String symbol, String failure) { }
 
+    public PriceUpdateResult updateAllStockPrices(BiConsumer<Integer, Integer> progress)
+            throws SQLException, InterruptedException {
+        List<String> symbols = getAllStockSymbols();
+        progress.accept(0, symbols.size());
+        if (symbols.isEmpty()) return new PriceUpdateResult(0, 0, Map.of());
+        ExecutorService pool = Executors.newFixedThreadPool(Math.min(4, symbols.size()), r -> {
+            Thread thread = new Thread(r, "quote-refresh");
+            thread.setDaemon(true);
+            return thread;
+        });
+        Map<String, String> failures = new LinkedHashMap<>();
         try {
-            List<String> symbols = getAllStockSymbols();
-            if (symbols.isEmpty()) {
-                System.out.println("No stocks found in the 'stocks' table to update");
-                return;
-            }
-
-            // Fetch prices concurrently on a bounded pool: turns the batch from
-            // N * latency (sequential) into roughly ceil(N / poolSize) * latency,
-            // while capping concurrency so we don't exhaust threads or hit API rate limits.
-            int poolSize = Math.min(4, symbols.size());
-            ExecutorService pool = Executors.newFixedThreadPool(poolSize);
-            try {
-                List<Callable<Void>> tasks = new ArrayList<>();
-                for (String symbol : symbols) {
-                    tasks.add(() -> {
-                        System.out.println("Updating price for: " + symbol);
+            CompletionService<QuoteResult> completion = new ExecutorCompletionService<>(pool);
+            for (String symbol : symbols) {
+                completion.submit(() -> {
+                    try {
                         updateStockPrice(symbol);
-                        return null;
-                    });
+                        return new QuoteResult(symbol, null);
+                    } catch (SQLException e) {
+                        return new QuoteResult(symbol, "Database update failed.");
+                    } catch (OperationException e) {
+                        return new QuoteResult(symbol, e.getMessage());
+                    }
+                });
+            }
+            for (int completed = 1; completed <= symbols.size(); completed++) {
+                QuoteResult result;
+                try { result = completion.take().get(); }
+                catch (ExecutionException e) {
+                    throw new OperationException("Price refresh stopped unexpectedly. Some prices may have updated.", e);
                 }
-                pool.invokeAll(tasks); // blocks until every price has been updated
-            } finally {
-                pool.shutdown();
+                if (result.failure() != null) failures.put(result.symbol(), result.failure());
+                progress.accept(completed, symbols.size());
             }
-
-            System.out.println("All stock prices updated.");
-        } catch (SQLException e) {
-            System.out.println("A database error occurred while getting stock symbols. ");
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            System.out.println("Price update was interrupted.");
-        }
+        } finally { pool.shutdownNow(); }
+        return new PriceUpdateResult(symbols.size(), symbols.size() - failures.size(), failures);
     }
 
-    public PortfolioItem getPortfolioPosition(String symbol) {
-
-        String query = """
-                SELECT 
-                    p.symbol,
-                    s.price AS current_price,
-                    SUM(p.quantity) AS total_quantity,
-                    SUM(p.quantity * p.buy_price) / SUM(p.quantity) AS average_buy_price,
-                    SUM((s.price - p.buy_price) * p.quantity) AS total_profit_loss
-                FROM 
-                    portfolio p
-                JOIN 
-                    stocks s ON p.symbol = s.symbol
-                WHERE 
-                    p.symbol = ?
-                GROUP BY 
-                    p.symbol, s.price;
-                """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
+    public boolean deletePortfolioPosition(String symbol) throws SQLException {
+        try (Connection conn = connections.open();
+             PreparedStatement stmt = conn.prepareStatement("DELETE FROM portfolio WHERE symbol = ?")) {
             stmt.setString(1, symbol);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-
-                    return new PortfolioItem(
-                            rs.getString("symbol"),
-                            rs.getInt("total_quantity"),
-                            rs.getDouble("average_buy_price"),
-                            rs.getDouble("current_price"),
-                            rs.getDouble("total_profit_loss")
-                    );
-                } else {
-
-                    return null;
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            return null;
+            return stmt.executeUpdate() > 0;
         }
     }
 
-    public ObservableList<StockItem> getAllStocks() {
-        ObservableList<StockItem> stockList = FXCollections.observableArrayList();
-
-        String query = """
-                    SELECT 
-                        s.symbol, 
-                        s.name, 
-                        s.price, 
-                        COALESCE(SUM(p.quantity), 0) > 0 AS is_holding 
-                    FROM 
-                    stocks s
-                LEFT JOIN 
-                    portfolio p ON s.symbol = p.symbol
-                GROUP BY 
-                    s.symbol, s.name, s.price
-                ORDER BY 
-                    s.name;
-                """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
-
-            while (rs.next()) {
-                stockList.add(new StockItem(
-                        rs.getString("symbol"),
-                        rs.getString("name"),
-                        rs.getDouble("price"),
-                        rs.getBoolean("is_holding")
-                ));
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return stockList;
+    private static void requirePrice(double price, String symbol) {
+        if (!Double.isFinite(price) || price <= 0)
+            throw new OperationException("No valid price is available for " + symbol + ". No purchase or price update was saved.");
     }
-
-    public double getTotalPortfolioPL() {
-
-        String query = """
-                SELECT SUM((s.price - p.buy_price) * p.quantity) AS total_pl
-                FROM portfolio p
-                JOIN stocks s ON p.symbol = s.symbol;
-                """;
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
-
-            if (rs.next()) {
-                return rs.getDouble("total_pl");
-            }
-
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        return 0.0;
-    }
-
-    public double getTotalInvestedAmount() {
-        String query = "SELECT SUM(buy_price * quantity) AS total_invested FROM portfolio";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query);
-             ResultSet rs = stmt.executeQuery()) {
-
-            if (rs.next()) {
-                return rs.getDouble("total_invested");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return 0.0;
-    }
-
-    public boolean deletePortfolioPosition(String symbol) {
-        String query = "DELETE FROM portfolio WHERE symbol = ?";
-
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(query)) {
-
-            stmt.setString(1, symbol);
-            int rowsAffected = stmt.executeUpdate();
-
-            System.out.println("Deleted " + rowsAffected + " entries for symbol: " + symbol);
-            return rowsAffected > 0;
-        } catch (SQLException e) {
-            System.out.println("Error deleting portfolio position for: " + symbol);
-            e.printStackTrace();
-            return false;
-        }
-    }
-
 }
