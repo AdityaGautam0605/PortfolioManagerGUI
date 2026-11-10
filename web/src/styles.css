@@ -147,7 +147,7 @@ svg {
   padding: 0 66px;
 }
 .app-header {
-  height: 106px;
+  height: 64px;
   display: flex;
   align-items: center;
   gap: 23px;
@@ -259,15 +259,15 @@ svg {
   background: var(--surface);
 }
 main {
-  padding-top: 22px;
   padding-bottom: 113px;
 }
+.app-shell > main { padding-top: 8px; }
 .page-heading {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 32px;
+  margin-bottom: 20px;
 }
 .breadcrumb {
   display: flex;
@@ -1589,7 +1589,7 @@ kbd {
     padding: 0 25px;
   }
   .app-header {
-    height: 85px;
+    height: 60px;
   }
   .page-heading {
     align-items: flex-start;
@@ -1685,7 +1685,7 @@ kbd {
   }
   .app-header {
     gap: 12px;
-    height: 75px;
+    height: 56px;
   }
   .brand {
     font-size: 25px;
@@ -1699,19 +1699,16 @@ kbd {
   .avatar {
     display: none;
   }
-  main {
-    padding-top: 15px;
-  }
   .page-heading {
     display: block;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
   }
   .page-heading p {
     font-size: 11px;
   }
   .heading-actions {
     flex-direction: row;
-    margin-top: 20px;
+    margin-top: 12px;
   }
   .heading-actions > .button {
     flex: 1;

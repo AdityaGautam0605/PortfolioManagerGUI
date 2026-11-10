@@ -525,11 +525,11 @@ function Workspace() {
       <main>
         <div className="page-heading">
           <div>
-            <div className="breadcrumb">
+            {route !== '/' && <div className="breadcrumb">
               <span>Your workspace</span>
               <ChevronRight size={12} />
               {pageTitle}
-            </div>
+            </div>}
             <h1>{route === '/' ? 'Portfolio overview' : pageTitle}</h1>
             <p>
               {route === '/'
