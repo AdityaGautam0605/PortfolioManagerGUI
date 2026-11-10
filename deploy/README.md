@@ -24,6 +24,7 @@ Render needs the repository version containing `Dockerfile`, `pom.xml`, `render.
 | `DB_PASSWORD` | Neon role password |
 | `FINNHUB_API_KEY` | Your Finnhub key |
 | `ALPHAVANTAGE_API_KEY` | Your Alpha Vantage key |
+| `TWELVEDATA_API_KEY` | Optional server-side backup for daily charts. Use your Twelve Data key with access to the symbols you display. Add it in Render → Environment and redeploy. |
 
 5. Deploy and wait for `/api/health` on the assigned `https://…onrender.com` URL to return `{"mode":"hosted"}`. A direct `/api/snapshot` request without a session must return HTTP 401. This is expected.
 

@@ -786,6 +786,7 @@ function Workspace() {
                     <p>
                       {demo
                         ? 'A safe place to explore. This workspace uses sample prices and history.'
+                        : data.account ? 'Prices reflect the last saved quotes.'
                         : 'Your portfolio stays local. Prices reflect the last saved quotes.'}
                     </p>
                   </div>

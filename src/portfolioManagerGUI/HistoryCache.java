@@ -30,7 +30,7 @@ public final class HistoryCache implements AutoCloseable {
     }
 
     public HistoryCache(Function<String, ? extends List<HistoricalDataPoint>> loader) {
-        this(loader, System::currentTimeMillis, Duration.ofMinutes(15), Duration.ofHours(24),
+        this(loader, System::currentTimeMillis, Duration.ofHours(6), Duration.ofHours(24),
                 Duration.ofSeconds(30), Duration.ofMillis(150));
     }
 
@@ -54,7 +54,7 @@ public final class HistoryCache implements AutoCloseable {
             boolean usable = entry.points != null && age <= staleMs;
             if (clock.getAsLong() < entry.retryAt) {
                 if (usable) return result(entry, true);
-                throw new OperationException(entry.failure + " Wait briefly before retrying.");
+                throw new OperationException(entry.failure);
             }
             if (entry.pending == null) {
                 CompletableFuture<Result> next = new CompletableFuture<>();

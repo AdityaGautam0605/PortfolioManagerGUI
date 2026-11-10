@@ -34,7 +34,7 @@ public class StockApiChecks {
         StockAPI api = new StockAPI(url -> {
             if (timeout) throw new java.net.http.HttpTimeoutException("private-response");
             return StockAPI.httpGet("http://127.0.0.1:" + server.getAddress().getPort() + "/");
-        });
+        }, null);
         try {
         body = "{\"c\": 123.45}";
         check(api.fetchLivePrice("AAPL") == 123.45, "Valid quote");
@@ -45,7 +45,11 @@ public class StockApiChecks {
         body = "{\"error\": \"private-response\"}";
         failure("rejected", () -> api.fetchLivePrice("AAPL"));
         body = "{\"Information\": \"private-response\"}";
-        failure("rate limit", () -> api.fetchHistoricalData("AAPL"));
+        failure("provider notice", () -> api.fetchHistoricalData("AAPL"));
+        body = "{\"Information\":\"standard rate limit of 25 requests per day\"}";
+        failure("daily allowance", () -> api.fetchHistoricalData("AAPL"));
+        body = "{\"Information\":\"premium endpoint\"}";
+        failure("plan restriction", () -> api.fetchHistoricalData("AAPL"));
         body = "invalid private-response";
         failure("invalid response", () -> api.fetchLivePrice("AAPL"));
         status = 429;
@@ -64,6 +68,22 @@ public class StockApiChecks {
                 "History must be sorted chronologically and preserve all points");
         body = "{}";
         failure("unavailable", () -> api.fetchHistoricalData("AAPL"));
+        String backup = """
+                {"meta":{"symbol":"AAPL","interval":"1day","exchange_timezone":"America/New_York"},
+                "values":[{"datetime":"2024-01-04","close":"103.5"},{"datetime":"2024-01-02","close":"101.2"},{"datetime":"2024-01-03","close":null}]}
+                """;
+        int[] calls = {0};
+        var restricted = new StockAPI(url -> {
+            if (url.startsWith("https://www.alphavantage.co/")) return "{\"Information\":\"private-response\"}";
+            check(url.equals("https://api.twelvedata.com/time_series?interval=1day&outputsize=100&symbol=AAPL&apikey=backup-test"), "Backup must receive only the symbol, not the primary key");
+            calls[0]++;
+            return backup;
+        }, "backup-test");
+        var recovered = restricted.fetchHistoricalData("AAPL");
+        check(calls[0] == 1 && recovered.size() == 2, "Quota response falls back once and skips missing closes");
+        check(recovered.getFirst().getDate().equals("2024-01-02") && recovered.getLast().getPrice() == 103.5, "Fallback sorts exchange dates and preserves actual closes");
+        var wrong = new StockAPI(url -> url.contains("alphavantage.co") ? "{}" : backup.replace("AAPL", "MSFT"), "backup-test");
+        failure("Backup daily history is also unavailable", () -> wrong.fetchHistoricalData("AAPL"));
         System.out.println("PASS: " + checks + " stock API regression checks");
         } finally { server.stop(0); }
     }
