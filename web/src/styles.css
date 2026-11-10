@@ -173,15 +173,6 @@ svg {
 .brand-dot {
   color: var(--muted);
 }
-.header-divider {
-  height: 20px;
-  width: 1px;
-  background: var(--border-strong);
-}
-.workspace-name {
-  font-size: 12px;
-  color: var(--muted);
-}
 .header-right {
   margin-left: auto;
   display: flex;
@@ -1599,10 +1590,6 @@ kbd {
   }
   .app-header {
     height: 85px;
-  }
-  .workspace-name,
-  .header-divider {
-    display: none;
   }
   .page-heading {
     align-items: flex-start;

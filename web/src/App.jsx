@@ -479,19 +479,13 @@ function Workspace() {
             folio<span className="brand-dot">.</span>
           </span>
         </a>
-        <div className="header-divider" />
-        <span className="workspace-name">Personal workspace</span>
         <div className="header-right">
-          <span className={`connection-pill ${!data ? 'disconnected' : demo ? 'demo' : ''}`}>
-            <i />
-            {data
-              ? demo
-                ? 'Demo · sample data'
-                : 'Connected workspace'
-              : loading
-                ? 'Connecting'
-                : 'Unavailable'}
-          </span>
+          {(demo || !data) && (
+            <span className={`connection-pill ${demo ? 'demo' : 'disconnected'}`}>
+              <i />
+              {demo ? 'Demo · sample data' : loading ? 'Connecting' : 'Unavailable'}
+            </span>
+          )}
           <button
             className="icon-button"
             title="Toggle color theme"
