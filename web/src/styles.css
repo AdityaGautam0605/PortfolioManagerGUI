@@ -1946,3 +1946,41 @@ kbd {
   font-size: 10px;
   line-height: 1.6;
 }
+
+@media (max-width: 540px) {
+  .holdings-page .breadcrumb { display: none; }
+  .holdings-page .page-heading { margin-bottom: 12px; }
+  .holdings-page .page-heading p { margin-top: 3px; }
+  .holdings-page .heading-actions { margin-top: 8px; }
+  .holdings-page .stat-grid {
+    gap: 0;
+    margin-bottom: 12px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 11px;
+  }
+  .holdings-page .stat {
+    padding: 9px 14px;
+    gap: 2px 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+  .holdings-page .stat + .stat { border-top: 1px solid var(--border); }
+  .holdings-page .stat > strong { font-size: 18px; letter-spacing: -.4px; }
+  .holdings-page .stat > .eyebrow { grid-row: 1 / span 2; align-self: center; }
+  .holdings-page .table-toolbar {
+    flex-flow: row wrap;
+    align-items: center;
+    gap: 4px 8px;
+    padding: 8px 12px;
+  }
+  .holdings-page .table-toolbar > div { width: auto; margin-left: auto; gap: 6px; }
+  .holdings-page .table-scroll { position: relative; }
+  .holdings-page .table-toolbar :is(button, select),
+  .holdings-page .asset-button { min-height: 44px; }
+  .holdings-page th { padding: 8px 12px; }
+  .holdings-page td { padding: 4px 12px; }
+  .holdings-page .table-footnote { padding: 10px 12px; }
+  .holdings-page .empty { padding: 24px 14px; gap: 8px; }
+}

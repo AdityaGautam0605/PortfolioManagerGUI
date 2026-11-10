@@ -522,7 +522,7 @@ function Workspace() {
           ) : <span className="avatar" title="Personal portfolio">P</span>}
         </div>
       </header>
-      <main>
+      <main className={route === '/holdings' ? 'holdings-page' : undefined}>
         <div className="page-heading">
           <div>
             {route !== '/' && <div className="breadcrumb">
