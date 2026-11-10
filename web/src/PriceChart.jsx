@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
-import { money } from './api.js';
+import { money, percent, tone } from './api.js';
 import { cachedHistory, freshHistory, loadHistory } from './history.js';
 
 export default function PriceChart({ symbol, demo = false }) {
@@ -68,6 +68,7 @@ export default function PriceChart({ symbol, demo = false }) {
     .join(' ');
   const active = hover === null ? null : points[hover];
   const last = points.at(-1);
+  const change = points.length > 1 && points[0].price > 0 ? 100 * (last.price / points[0].price - 1) : null;
   return (
     <div className="chart-component">
       <div className="chart-heading">
@@ -76,10 +77,11 @@ export default function PriceChart({ symbol, demo = false }) {
           <div className="chart-symbol">
             {symbol || 'Select a stock'} <ArrowUpRight size={14} />
           </div>
+          {change !== null && <span className={`chart-period-change ${tone(change)}`}>{percent(change)} · {points.length} sessions</span>}
         </div>
         <div className="chart-quote">
           {active ? money(active.price) : last ? money(last.price) : '—'}
-          <span>{active ? active.date : 'Closing price'}</span>
+          <span>{active ? active.date : last ? `Close · ${last.date}` : 'Closing price'}</span>
         </div>
       </div>
       <div className="chart-canvas">

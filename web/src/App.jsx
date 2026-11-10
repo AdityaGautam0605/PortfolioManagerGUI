@@ -6,6 +6,8 @@ import {
   Bookmark,
   Check,
   ChevronLeft,
+  ChevronDown,
+  LogOut,
   ChevronRight,
   CircleHelp,
   Command,
@@ -24,6 +26,8 @@ import {
   Sun,
   Trash2,
   TrendingUp,
+  TrendingDown,
+  Minus,
   Wallet,
   X,
 } from 'lucide-react';
@@ -219,6 +223,18 @@ export default function App() {
 }
 
 function Workspace() {
+  const accountMenu = useRef(null);
+  useEffect(() => {
+    const closeOutside = (e) => {
+      if (accountMenu.current?.open && !accountMenu.current.contains(e.target)) accountMenu.current.open = false;
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('focusin', closeOutside);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('focusin', closeOutside);
+    };
+  }, []);
   const [route, setRoute] = useState(location.hash.slice(1) || '/');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -252,7 +268,10 @@ function Workspace() {
   const invested = positions.reduce((sum, p) => sum + p.quantity * p.averageCost, 0);
   const profit = positions.reduce((sum, p) => sum + p.profitLoss, 0);
   const returns = invested ? (profit / invested) * 100 : 0;
-  const largest = [...positions].sort((a, b) => b.price * b.quantity - a.price * a.quantity)[0];
+  const byValue = [...positions].sort((a, b) => b.price * b.quantity - a.price * a.quantity);
+  const largest = byValue[0];
+  const weight = (p) => total > 0 ? 100 * p.price * p.quantity / total : 0;
+  const ProfitIcon = profit > 0 ? TrendingUp : profit < 0 ? TrendingDown : Minus;
   const best = [...positions].sort((a, b) => b.returnPercent - a.returnPercent)[0];
   const worst = [...positions].sort((a, b) => a.returnPercent - b.returnPercent)[0];
   const currentSymbol = positions.some((p) => p.symbol === chartSymbol)
@@ -463,13 +482,6 @@ function Workspace() {
         <div className="header-divider" />
         <span className="workspace-name">Personal workspace</span>
         <div className="header-right">
-          {data?.account && <button className="button ghost account-signout" aria-label={`Sign out · ${data.account.username}`} title={`Signed in as ${data.account.username}`} onClick={async () => {
-            try {
-              await request('/auth/logout', { method: 'POST' });
-              announceAccountChange();
-              window.dispatchEvent(new Event('folio-auth-required'));
-            } catch (e) { setNotice({ type: 'error', message: e.message }); }
-          }}>Sign out<span className="account-name"> · {data.account.username}</span></button>}
           <span className={`connection-pill ${!data ? 'disconnected' : demo ? 'demo' : ''}`}>
             <i />
             {data
@@ -488,9 +500,32 @@ function Workspace() {
           >
             {theme === 'dark' ? <Moon size={19} /> : <Sun size={19} />}
           </button>
-          <span className="avatar" title="Personal portfolio">
-            P
-          </span>
+          {data?.account ? (
+            <details className="account-menu" ref={accountMenu} onKeyDown={e => {
+              if (e.key === 'Escape' && e.currentTarget.open) {
+                e.currentTarget.open = false;
+                e.currentTarget.querySelector('summary').focus();
+              }
+            }}>
+              <summary aria-label={`Account: ${data.account.username}`}>
+                <span className="account-initial" aria-hidden="true">{data.account.username[0].toUpperCase()}</span>
+                <span className="account-name">{data.account.username}</span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </summary>
+              <div className="account-popover">
+                <small>Signed in as</small>
+                <strong>{data.account.username}</strong>
+                <button type="button" onClick={async () => {
+                  accountMenu.current.open = false;
+                  try {
+                    await request('/auth/logout', { method: 'POST' });
+                    announceAccountChange();
+                    window.dispatchEvent(new Event('folio-auth-required'));
+                  } catch (e) { setNotice({ type: 'error', message: e.message }); }
+                }}><LogOut size={15} /> Sign out</button>
+              </div>
+            </details>
+          ) : <span className="avatar" title="Personal portfolio">P</span>}
         </div>
       </header>
       <main>
@@ -501,10 +536,10 @@ function Workspace() {
               <ChevronRight size={12} />
               {pageTitle}
             </div>
-            <h1>{route === '/' ? 'Your portfolio, in focus.' : pageTitle}</h1>
+            <h1>{route === '/' ? 'Portfolio overview' : pageTitle}</h1>
             <p>
               {route === '/'
-                ? 'A little perspective on everything you own.'
+                ? 'Holdings, allocation and performance at your last saved prices.'
                 : route === '/holdings'
                   ? 'Every position. One clear picture.'
                   : route === '/library'
@@ -585,12 +620,12 @@ function Workspace() {
                   <div className="panel-topline">
                     <span className="eyebrow">Portfolio value</span>
                     <span className="tiny-tag">
-                      <Wallet size={12} /> {positions.length} holdings
+                      <Wallet size={12} /> {positions.length} {positions.length === 1 ? 'holding' : 'holdings'}
                     </span>
                   </div>
                   <div className="portfolio-value">{money(total)}</div>
                   <div className={`portfolio-return ${tone(profit)}`}>
-                    <TrendingUp size={15} />
+                    <ProfitIcon size={15} />
                     {signedMoney(profit)} <span>({percent(returns)})</span>
                     <span className="muted"> on current holdings</span>
                   </div>
@@ -637,18 +672,18 @@ function Workspace() {
                       </button>
                     </div>
                     <div className="allocation-track" aria-label="Portfolio allocation">
-                      {positions.map((p, i) => (
+                      {byValue.map((p, i) => (
                         <span
                           key={p.symbol}
                           style={{
                             width: `${total ? ((p.quantity * p.price) / total) * 100 : 0}%`,
                             background: `var(--allocation-${i % 5})`,
                           }}
-                          title={`${p.symbol}: ${(((p.quantity * p.price) / total) * 100).toFixed(1)}%`}
+                          title={`${p.symbol}: ${weight(p).toFixed(1)}%`}
                         />
                       ))}
                     </div>
-                    {positions.slice(0, 5).map((p, i) => (
+                    {byValue.slice(0, 5).map((p, i) => (
                       <button
                         className="allocation-row"
                         key={p.symbol}
@@ -684,36 +719,28 @@ function Workspace() {
                     <h2>
                       {positions.length ? (
                         <>
-                          A clearer view.
-                          <br />
-                          <span className="soft">A more considered next move.</span>
+                          {largest.symbol} <span className="soft">{positions.length === 1 ? 'is your only position.' : 'is your largest position.'}</span>
                         </>
                       ) : (
                         <>
-                          Room for your
-                          <br />
-                          first investment.
+                          Your first holding starts here.
                         </>
                       )}
                     </h2>
                     <p>
                       {positions.length ? (
                         <>
-                          Your holdings are{' '}
-                          <span className={tone(returns)}>
-                            {returns >= 0 ? 'up' : 'down'} {Math.abs(returns).toFixed(2)}%
-                          </span>{' '}
-                          against their cost basis. {largest.symbol} is your largest position,
-                          making up{' '}
-                          <strong>
-                            {(((largest.price * largest.quantity) / total) * 100).toFixed(1)}%
-                          </strong>{' '}
-                          of your portfolio.
+                          At saved prices, your portfolio is {Math.abs(profit) < 0.005 ? 'at its cost basis' :
+                            <><strong className={tone(profit)}>{money(Math.abs(profit))}</strong> {profit > 0 ? 'above' : 'below'} its cost basis</>}.
                         </>
                       ) : (
                         'Build your portfolio one position at a time. Record a trade to see your allocation and performance here.'
                       )}
                     </p>
+                    {largest && <div className="brief-allocation">
+                      <div><span>Portfolio weight · {largest.symbol}</span><strong>{weight(largest).toFixed(1)}%</strong></div>
+                      <div className="brief-meter"><i style={{ width: `${weight(largest)}%` }} /></div>
+                    </div>}
                     <button className="text-button" onClick={() => go('/holdings')}>
                       Explore your portfolio <ArrowRight size={15} />
                     </button>
@@ -735,7 +762,7 @@ function Workspace() {
                       <p className="muted">Your holdings will appear here.</p>
                     )}
                   </section>
-                  <section className="insight-grid">
+                  {positions.length > 1 && <section className="insight-grid">
                     <button
                       className="insight-card"
                       disabled={!best}
@@ -780,7 +807,7 @@ function Workspace() {
                       </span>
                       <span className="muted">Since your purchase</span>
                     </button>
-                  </section>
+                  </section>}
                   <div className="quiet-note">
                     <ShieldCheck size={16} />
                     <p>
