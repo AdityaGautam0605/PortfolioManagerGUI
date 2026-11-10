@@ -101,6 +101,7 @@ export default function PriceChart({ symbol, demo = false }) {
           <div className="chart-message">No price history available.</div>
         ) : (
           <svg
+            className={tone(change)}
             viewBox={`0 0 ${width} ${height}`}
             role="img"
             aria-label={`${symbol} daily closing price chart, ${points.length} sessions`}
