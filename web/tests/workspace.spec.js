@@ -244,3 +244,88 @@ test('pending trades cannot be submitted twice', async ({ page }) => {
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(calls).toBe(1);
 });
+
+test('chart history is reused across symbols, pages, and browser reloads', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/api/history?symbol=AAPL', (route) => {
+    calls++;
+    return route.continue();
+  });
+  await ready(page);
+  expect(calls).toBe(1);
+  await page.getByLabel('Explore a holding').selectOption('NVDA');
+  await expect(page.getByRole('img', { name: /NVDA daily/ })).toBeVisible();
+  await page.getByLabel('Explore a holding').selectOption('AAPL');
+  await expect(page.getByRole('img', { name: /AAPL daily/ })).toBeVisible();
+  expect(calls).toBe(1);
+  await page.getByRole('link', { name: 'Holdings', exact: true }).click();
+  await page.getByRole('link', { name: 'Overview', exact: true }).click();
+  await expect(page.getByRole('img', { name: /AAPL daily/ })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('img', { name: /AAPL daily/ })).toBeVisible();
+  expect(calls).toBe(1);
+});
+
+test('stale cached chart remains visible when the provider times out', async ({ page }) => {
+  await page.addInitScript(() =>
+    sessionStorage.setItem(
+      'folio-history-v1:demo',
+      JSON.stringify([
+        {
+          symbol: 'AAPL',
+          fetchedAt: Date.now() - 20 * 60 * 1000,
+          points: [
+            { date: '2026-09-25', price: 230 },
+            { date: '2026-09-28', price: 237 },
+          ],
+        },
+      ]),
+    ),
+  );
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  await page.route('**/api/history?symbol=AAPL', async (route) => {
+    await gate;
+    await route.fulfill({
+      status: 503,
+      json: { error: 'The data provider timed out. Try again later.' },
+    });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('img', { name: /AAPL daily/ })).toBeVisible();
+  await expect(page.getByText('Updating history in the background…')).toBeVisible();
+  release();
+  await expect(page.locator('.history-status')).toContainText('Showing saved history');
+  await expect(page.locator('.history-status')).toContainText('timed out');
+  await expect(page.getByRole('img', { name: /AAPL daily/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry update' })).toBeVisible();
+});
+
+test('unfinished history is polled automatically until the chart is ready', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/api/history?symbol=AAPL', async (route) => {
+    calls++;
+    if (calls <= 2)
+      return route.fulfill({
+        status: 202,
+        json: { symbol: 'AAPL', pending: true, retryAfterMs: 500 },
+      });
+    return route.fulfill({
+      json: {
+        symbol: 'AAPL',
+        fetchedAt: Date.now(),
+        points: [
+          { date: '2026-09-25', price: 230 },
+          { date: '2026-09-28', price: 237 },
+        ],
+      },
+    });
+  });
+  await page.goto('/');
+  await expect(page.getByText('Loading AAPL history…')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry history', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('img', { name: /AAPL daily/ })).toBeVisible();
+  expect(calls).toBe(3);
+});

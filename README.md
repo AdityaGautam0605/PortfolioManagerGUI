@@ -1,6 +1,18 @@
 # Folio portfolio workspace
 
-A React + Vite web interface for the existing Java/MySQL portfolio manager. The new UI has Overview, Holdings, Stock Library, Watchlist, Settings, and individual stock pages. It runs locally; Java keeps database credentials and API keys off the browser. The original JavaFX entry point remains available as `Main`.
+A React + Vite web interface for the existing Java/MySQL portfolio manager. The new UI has Overview, Holdings, Stock Library, Watchlist, Settings, and individual stock pages. It runs locally; Java keeps database credentials and API keys off the browser.
+
+## Hosted multi-user deployment
+
+The opt-in `WebServer --hosted` mode adds registration, sign-in, and separate portfolios backed by Neon PostgreSQL. Render builds the included Dockerfile; Vercel forwards `/api` requests to Render. See [the deployment guide](deploy/README.md) for the account setup, required secrets, and final connection steps. Local mode remains single-user; existing local holdings are not imported automatically.
+
+## Run from IntelliJ
+
+Run `Main` as before. It now builds the React interface, starts the Java web server using your configured portfolio, and opens your browser. Node.js/npm must be available to the IDE. Building Java alone compiles the launcher; running it builds and opens the web UI.
+
+Use program arguments `--demo` for sample data, `--no-open` to skip opening the browser, or `--skip-build` to reuse an existing web bundle. If port 8080 is occupied, the launcher opens a different available port instead of accidentally showing an older demo server. An explicit `--port 8081` can also be used.
+
+The previous JavaFX interface is available only by explicitly running `LegacyDesktopApp`.
 
 ## Run the new interface
 
@@ -43,6 +55,7 @@ Run the Java API on port 8080, then `npm run dev --prefix web`. Vite serves the 
 - UI operations are asynchronous. Repeated submissions are disabled and server-side writes are serialized within this server process.
 - Refreshes expose progress and per-symbol failures. A saved trade stays reported as saved even when a following reload fails. Failed reloads keep the previous portfolio visible.
 - Charts are selected-stock daily price history, not historical portfolio value. Connected history uses the existing provider; demo history is explicitly sample data.
+- Daily history is cached for 15 minutes in the server and browser session. Concurrent requests for the same stock share a provider call; navigation and browser reloads reuse cached data. History up to 24 hours old stays visible while updating, with a saved-data label if refreshing fails. Uncached requests return HTTP 202 while loading; the browser polls automatically until the provider completes. The shared HTTP client reuses connections and applies a 12-second overall request timeout. Actual provider failures have a 30-second retry cooldown. New symbols still depend on provider availability.
 - Portfolio briefs summarize current holdings. They are not market news or investment recommendations.
 - Returns are unrealized and exclude fees, dividends, and closed positions. The existing average-cost accounting is retained.
 - Watchlists and theme preference are saved in this browser, separately for demo and connected mode. They are not synchronized across devices.

@@ -1,0 +1,17 @@
+.git
+.idea
+.codex
+.agents
+.npm-cache
+out
+target
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+**/config.properties
+**/.env*
+**/*.pem
+**/*.p12
+**/*.jks
+**/tests

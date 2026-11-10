@@ -11,3 +11,7 @@ The checks compile the application, exercise database/provider failures, partial
 The UI checks render an invisible JavaFX window on a desktop session and save screenshots under the ignored `out/checks` directory. They verify that a blocked database read does not block the UI, duplicate submissions are disabled, failed trades preserve inputs, a successful trade is still reported as saved if reloading fails, and stale chart responses cannot replace the selected stock.
 
 Live MySQL schema compatibility and real provider credentials still require integration testing in the configured environment.
+
+## Hosted accounts
+
+`HostedChecks` uses a disposable H2 2.3.232 in-memory database in PostgreSQL compatibility mode. It exercises password/session handling, API access controls, per-account portfolios, and concurrent sale protection. It never connects to the configured real portfolio. Run `tests/run-hosted-checks.ps1` with `-Jdk`, `-JavaFx`, `-JsonJar`, and `-H2Jar` paths. This validates SQL behavior against H2, not Neon/PostgreSQL TLS or the cloud deployment; perform the two-account live smoke test in `deploy/README.md` after deployment.

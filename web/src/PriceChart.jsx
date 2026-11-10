@@ -1,33 +1,55 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
-import { money, request } from './api.js';
+import { money } from './api.js';
+import { cachedHistory, freshHistory, loadHistory } from './history.js';
 
 export default function PriceChart({ symbol, demo = false }) {
-  const [result, setResult] = useState({ symbol: '', points: [] });
+  const [result, setResult] = useState(
+    () => cachedHistory(symbol, demo) || { symbol: '', points: [] },
+  );
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState('3M');
   const [retry, setRetry] = useState(0);
+  const lastRetry = useRef(0);
   const [hover, setHover] = useState(null);
   const fillId = useId().replaceAll(':', '');
   useEffect(() => {
     if (!symbol) return;
-    const controller = new AbortController();
-    setLoading(true);
+    let active = true;
+    let timer;
+    let polls = 0;
+    const cached = cachedHistory(symbol, demo);
+    const force = retry !== lastRetry.current;
+    lastRetry.current = retry;
+    setResult(cached || { symbol, points: [] });
+    setLoading(force || !freshHistory(cached));
     setError('');
     setHover(null);
-    request(`/history?symbol=${encodeURIComponent(symbol)}`, { signal: controller.signal })
-      .then((data) => {
-        if (!controller.signal.aborted) setResult(data);
-      })
-      .catch((e) => {
-        if (!controller.signal.aborted) setError(e.message);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-    return () => controller.abort();
-  }, [symbol, retry]);
+    const load = (force) =>
+      loadHistory(symbol, demo, force)
+        .then((data) => {
+          if (!active) return;
+          const keepPolling = data.refreshing && polls++ < 20;
+          setResult(keepPolling ? data : { ...data, refreshing: false });
+          setError(data.warning || '');
+          if (keepPolling) timer = setTimeout(() => load(true), 1000);
+        })
+        .catch((e) => {
+          if (active) {
+            setError(e.message);
+            setResult((old) => ({ ...old, refreshing: false }));
+          }
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    load(force);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [symbol, demo, retry]);
   const source = result.symbol === symbol ? result.points : [];
   const count = range === '1M' ? 22 : range === '3M' ? 66 : source.length;
   const points = source.slice(-count);
@@ -61,12 +83,12 @@ export default function PriceChart({ symbol, demo = false }) {
         </div>
       </div>
       <div className="chart-canvas">
-        {loading ? (
+        {loading && !points.length ? (
           <div className="chart-message">
             <RefreshCw className="spin" size={19} />
             <span>Loading {symbol} history…</span>
           </div>
-        ) : error ? (
+        ) : error && !points.length ? (
           <div className="chart-message">
             <span>{error}</span>
             <button className="button subtle" onClick={() => setRetry((r) => r + 1)}>
@@ -126,6 +148,20 @@ export default function PriceChart({ symbol, demo = false }) {
           </svg>
         )}
       </div>
+      {!!points.length && (loading || error || result.stale) && (
+        <div className="history-status" role="status">
+          <span>
+            {loading
+              ? 'Updating history in the background…'
+              : `Showing saved history from ${new Date(result.fetchedAt).toLocaleString()}. ${error || (result.refreshing ? 'Checking for newer data…' : '')}`}
+          </span>
+          {!loading && !result.refreshing && (
+            <button className="text-button" onClick={() => setRetry((r) => r + 1)}>
+              Retry update
+            </button>
+          )}
+        </div>
+      )}
       <div className="chart-footer">
         <span>
           {points[0]?.date || 'Daily history'}

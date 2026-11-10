@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.*;
 
 /** JavaFX smoke/regression checks using a fake service. No live trades or API calls. */
 public class UiChecks {
-    private static Main app;
+    private static LegacyDesktopApp app;
     private static Stage stage;
     private static final FakeManager manager = new FakeManager();
     private static int checks;
@@ -122,7 +122,7 @@ public class UiChecks {
         toolkit.await();
         try {
             fx(() -> {
-                app = new Main(manager, symbol -> {
+                app = new LegacyDesktopApp(manager, symbol -> {
                     if (Platform.isFxApplicationThread()) throw new AssertionError("History on UI thread");
                     if (delayChart.get() && symbol.equals("AAPL")) {
                         firstChartStarted.countDown();

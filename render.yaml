@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: folio-api
+    region: singapore
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: FOLIO_PUBLIC_ORIGIN
+        value: https://portfolio-manager-gui.vercel.app
+      - key: FOLIO_INIT_SCHEMA
+        value: "true"
+      - key: DB_URL
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: ALPHAVANTAGE_API_KEY
+        sync: false

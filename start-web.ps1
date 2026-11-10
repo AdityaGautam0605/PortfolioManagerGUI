@@ -36,7 +36,7 @@ try {
     $out = Join-Path $repo 'out/web'
     New-Item -ItemType Directory -Force $out | Out-Null
     $sources = @(Get-ChildItem (Join-Path $repo 'src/portfolioManagerGUI') -Filter '*.java' | ForEach-Object FullName)
-    $sources += @('src/StockManager.java', 'src/DemoStockManager.java', 'src/WebServer.java')
+    $sources += @('src/StockManager.java', 'src/DemoStockManager.java', 'src/WebServer.java', 'src/HostedAuth.java', 'src/HostedSchema.java', 'src/HostedStockManager.java')
     & (Join-Path $Jdk 'bin/javac.exe') --module-path $JavaFx --add-modules javafx.base,jdk.httpserver -cp $JsonJar -d $out @sources
     if ($LASTEXITCODE -ne 0) { throw 'Java API compilation failed' }
     $classPath = "$out;$JsonJar;$(Join-Path $repo 'src')"

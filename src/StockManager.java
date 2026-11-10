@@ -107,7 +107,7 @@ public class StockManager {
         }
     }
 
-    private List<String> getAllStockSymbols() throws SQLException {
+    protected List<String> getAllStockSymbols() throws SQLException {
         List<String> symbols = new ArrayList<>();
         try (Connection conn = connections.open();
              PreparedStatement stmt = conn.prepareStatement("SELECT symbol FROM stocks ORDER BY symbol");

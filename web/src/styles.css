@@ -206,6 +206,27 @@ svg {
 .connection-pill.demo i {
   background: #b2a1c5;
 }
+.connection-pill.disconnected i {
+  background: var(--muted);
+}
+.auth-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.auth-panel { width: min(100%, 460px); padding: 36px; }
+.auth-panel h1 { margin: 24px 0 12px; }
+.auth-panel p, .auth-panel small { color: var(--muted); line-height: 1.6; }
+.auth-panel form { display: grid; gap: 12px; margin: 28px 0 12px; }
+.auth-panel input { width: 100%; min-height: 44px; }
+.auth-panel .negative { color: var(--negative); }
+.account-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 540px) {
+  .account-name { display: none; }
+  .account-signout { padding: 8px; font-size: 11px; }
+  .header-right:has(.account-signout) .connection-pill { display: none; }
+}
 .avatar {
   width: 29px;
   height: 29px;
@@ -1898,4 +1919,14 @@ kbd {
   .page-footer {
     font-size: 10px;
   }
+}
+.history-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
 }

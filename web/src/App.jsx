@@ -27,8 +27,9 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { go, money, percent, readStored, request, signedMoney, store, tone } from './api.js';
+import { announceAccountChange, go, money, percent, readStored, request, signedMoney, store, tone } from './api.js';
 import PriceChart from './PriceChart.jsx';
+import SignIn from './SignIn.jsx';
 
 const icons = { AAPL: 'A', NVDA: 'N', MSFT: 'M', GOOGL: 'G', AMZN: 'a', TSLA: 'T', META: '∞' };
 function StockMark({ symbol, small = false }) {
@@ -197,6 +198,27 @@ function TradeModal({ initial, pending, submit, close, demo, failureMessage }) {
 }
 
 export default function App() {
+  const [requiresSignIn, setRequiresSignIn] = useState(false);
+  const [accountVersion, setAccountVersion] = useState(0);
+  useEffect(() => {
+    const listener = () => setRequiresSignIn(true);
+    const accountChanged = (event) => {
+      if (event.key === 'folio-account-change') {
+        setAccountVersion(value => value + 1);
+        setRequiresSignIn(false);
+      }
+    };
+    window.addEventListener('folio-auth-required', listener);
+    window.addEventListener('storage', accountChanged);
+    return () => {
+      window.removeEventListener('folio-auth-required', listener);
+      window.removeEventListener('storage', accountChanged);
+    };
+  }, []);
+  return requiresSignIn ? <SignIn onSignedIn={() => setRequiresSignIn(false)} /> : <Workspace key={accountVersion} />;
+}
+
+function Workspace() {
   const [route, setRoute] = useState(location.hash.slice(1) || '/');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -214,7 +236,7 @@ export default function App() {
   const [sort, setSort] = useState('value');
   const [chartSymbol, setChartSymbol] = useState('');
   const demo = data?.mode === 'demo';
-  const mode = data?.mode || 'connected';
+  const mode = data?.account ? `hosted:${data.account.id}` : data?.mode || 'connected';
   const watched = Array.isArray(watchlists[mode])
     ? watchlists[mode]
     : demo
@@ -441,7 +463,14 @@ export default function App() {
         <div className="header-divider" />
         <span className="workspace-name">Personal workspace</span>
         <div className="header-right">
-          <span className={`connection-pill ${demo ? 'demo' : ''}`}>
+          {data?.account && <button className="button ghost account-signout" aria-label={`Sign out · ${data.account.username}`} title={`Signed in as ${data.account.username}`} onClick={async () => {
+            try {
+              await request('/auth/logout', { method: 'POST' });
+              announceAccountChange();
+              window.dispatchEvent(new Event('folio-auth-required'));
+            } catch (e) { setNotice({ type: 'error', message: e.message }); }
+          }}>Sign out<span className="account-name"> · {data.account.username}</span></button>}
+          <span className={`connection-pill ${!data ? 'disconnected' : demo ? 'demo' : ''}`}>
             <i />
             {data
               ? demo
@@ -544,7 +573,7 @@ export default function App() {
                 </button>
               }
             >
-              Check that the local server and database are available. Your saved holdings have not
+              Check that this website is connected to the portfolio server and database. Your saved holdings have not
               been replaced.
             </Empty>
           )

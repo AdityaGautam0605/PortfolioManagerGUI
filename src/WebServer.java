@@ -11,18 +11,22 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Same-origin local web app. Credentials and database access stay inside Java. */
+/** Same-origin app with opt-in authenticated hosting. Credentials stay inside Java. */
 public class WebServer {
     private final StockManager manager;
     private final boolean demo;
+    private final String publicOrigin;
+    private final HostedAuth auth;
     private final Path assets;
     private final AtomicBoolean writing = new AtomicBoolean();
     private final ExecutorService workers = Executors.newFixedThreadPool(8);
     private final ExecutorService refreshWorker = Executors.newSingleThreadExecutor();
     private final HttpServer server;
+    private final HistoryCache historyCache;
     private volatile RefreshJob job;
 
     private static class RefreshJob {
+        String owner;
         final String id = UUID.randomUUID().toString();
         volatile int completed, total;
         volatile JSONObject result;
@@ -36,20 +40,35 @@ public class WebServer {
         }
     }
     public WebServer(int port, Path assets, boolean demo) throws IOException {
+        this(port, assets, demo, null);
+    }
+    public WebServer(int port, Path assets, boolean demo, String publicOrigin) throws IOException {
+        if (publicOrigin != null) {
+            URI origin = URI.create(publicOrigin);
+            if (!"https".equals(origin.getScheme()) || origin.getHost() == null || origin.getRawUserInfo() != null
+                    || !origin.getRawPath().isEmpty() || origin.getRawQuery() != null || origin.getRawFragment() != null)
+                throw new IllegalArgumentException("FOLIO_PUBLIC_ORIGIN must be an HTTPS origin without a trailing slash.");
+            if (demo) throw new IllegalArgumentException("Hosted mode cannot use demo data.");
+        }
+        this.publicOrigin = publicOrigin;
+        this.auth = publicOrigin == null ? null : new HostedAuth();
         this.demo = demo;
         this.manager = demo ? new DemoStockManager() : new StockManager();
         this.assets = assets.toAbsolutePath().normalize();
-        server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 0);
+        server = HttpServer.create(new InetSocketAddress(auth == null ? "127.0.0.1" : "0.0.0.0", port), 0);
+        historyCache = new HistoryCache(symbol -> demo
+                ? ((DemoStockManager) manager).history(symbol) : StockAPI.getHistoricalData(symbol));
         server.setExecutor(workers);
         server.createContext("/api/", this::api);
         server.createContext("/", this::staticFile);
     }
     public void start() { server.start(); }
-    public void stop() { server.stop(0); workers.shutdownNow(); refreshWorker.shutdownNow(); }
+    public int getPort() { return server.getAddress().getPort(); }
+    public void stop() { server.stop(0); workers.shutdownNow(); refreshWorker.shutdownNow(); historyCache.close(); }
     private void api(HttpExchange exchange) throws IOException {
         try {
             String host = exchange.getRequestHeaders().getFirst("Host");
-            if (!Set.of("127.0.0.1:" + server.getAddress().getPort(), "localhost:" + server.getAddress().getPort()).contains(host == null ? "" : host)) {
+            if (auth == null && !Set.of("127.0.0.1:" + server.getAddress().getPort(), "localhost:" + server.getAddress().getPort()).contains(host == null ? "" : host)) {
                 send(exchange, 403, new JSONObject().put("error", "Invalid local host.")); return;
             }
             String method = exchange.getRequestMethod();
@@ -57,12 +76,44 @@ public class WebServer {
             if (!method.equals("GET")) {
                 if (!method.equals("POST")) { send(exchange, 405, error("Method not allowed.")); return; }
                 String origin = exchange.getRequestHeaders().getFirst("Origin");
-                boolean validOrigin = origin == null || origin.equals("http://" + host)
+                boolean validOrigin = auth != null ? publicOrigin.equals(origin) : origin == null || origin.equals("http://" + host)
                         || origin.equals("http://127.0.0.1:5173") || origin.equals("http://localhost:5173");
                 if (!validOrigin || !"portfolio-web".equals(exchange.getRequestHeaders().getFirst("X-Portfolio-Client"))) {
                     send(exchange, 403, error("Request origin is not allowed.")); return;
                 }
             }
+            if (method.equals("GET") && route.equals("/api/health")) {
+                send(exchange, 200, new JSONObject().put("mode", auth != null ? "hosted" : demo ? "demo" : "connected")); return;
+            }
+            HostedAuth.Account account = null;
+            if (auth != null) {
+                String token = HostedAuth.token(exchange.getRequestHeaders().getFirst("Cookie"));
+                if (method.equals("POST") && (route.equals("/api/auth/login") || route.equals("/api/auth/register"))) {
+                    if (!auth.allowAttempt()) {
+                        exchange.getResponseHeaders().set("Retry-After", "60");
+                        send(exchange, 429, error("Too many sign-in attempts. Please wait a minute.")); return;
+                    }
+                    JSONObject body = readBody(exchange);
+                    HostedAuth.Login login;
+                    try {
+                        login = route.endsWith("/register")
+                                ? auth.register(body.optString("username"), body.optString("password"))
+                                : auth.login(body.optString("username"), body.optString("password"));
+                    } catch (OperationException e) { send(exchange, 409, error(e.getMessage())); return; }
+                    if (login == null) { send(exchange, 401, error("Incorrect username or password.")); return; }
+                    exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(login.token()));
+                    send(exchange, 200, new JSONObject().put("message", "Signed in.")); return;
+                }
+                if (method.equals("POST") && route.equals("/api/auth/logout")) {
+                    auth.logout(token);
+                    exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(null));
+                    send(exchange, 200, new JSONObject().put("message", "Signed out.")); return;
+                }
+                account = auth.authenticate(token);
+                if (account == null) { send(exchange, 401, error("Sign in to access your portfolio.")); return; }
+            }
+            String owner = account == null ? "local" : account.id();
+            StockManager manager = account == null ? this.manager : new HostedStockManager(owner);
             if (method.equals("GET") && route.equals("/api/snapshot")) {
                 JSONArray positions = new JSONArray(), stocks = new JSONArray();
                 for (PortfolioItem item : manager.getPortfolioOverview()) positions.put(new JSONObject()
@@ -70,23 +121,32 @@ public class WebServer {
                         .put("price", item.getCurrentPrice()).put("profitLoss", item.getProfitLoss()).put("returnPercent", item.getProfitLossPercent()));
                 for (StockItem item : manager.getAllStocks()) stocks.put(new JSONObject().put("symbol", item.getSymbol())
                         .put("name", item.getName()).put("price", item.getPrice()).put("holding", item.isHolding()));
-                send(exchange, 200, new JSONObject().put("mode", demo ? "demo" : "connected")
-                        .put("positions", positions).put("stocks", stocks).put("loadedAt", Instant.now().toString()));
-            } else if (method.equals("GET") && route.equals("/api/health")) {
-                send(exchange, 200, new JSONObject().put("mode", demo ? "demo" : "connected"));
+                JSONObject snapshot = new JSONObject().put("mode", auth != null ? "hosted" : demo ? "demo" : "connected")
+                        .put("positions", positions).put("stocks", stocks).put("loadedAt", Instant.now().toString());
+                if (account != null) snapshot.put("account", new JSONObject().put("id", account.id()).put("username", account.username()));
+                send(exchange, 200, snapshot);
             } else if (method.equals("GET") && route.equals("/api/history")) {
                 String symbol = symbol(query(exchange, "symbol"));
                 JSONArray points = new JSONArray();
-                var history = demo ? ((DemoStockManager)manager).history(symbol) : StockAPI.getHistoricalData(symbol);
-                for (HistoricalDataPoint point : history) points.put(new JSONObject().put("date", point.getDate()).put("price", point.getPrice()));
-                send(exchange, 200, new JSONObject().put("symbol", symbol).put("points", points));
+                var history = historyCache.get(symbol);
+                if (history.refreshing() && history.points().isEmpty()) {
+                    exchange.getResponseHeaders().set("Retry-After", "1");
+                    send(exchange, 202, new JSONObject().put("symbol", symbol).put("pending", true).put("retryAfterMs", 750));
+                    return;
+                }
+                for (HistoricalDataPoint point : history.points()) points.put(new JSONObject().put("date", point.getDate()).put("price", point.getPrice()));
+                JSONObject response = new JSONObject().put("symbol", symbol).put("points", points)
+                        .put("fetchedAt", history.fetchedAt()).put("stale", history.stale()).put("refreshing", history.refreshing());
+                if (history.warning() != null) response.put("warning", history.warning());
+                send(exchange, 200, response);
             } else if (method.equals("GET") && route.startsWith("/api/jobs/")) {
                 RefreshJob current = job;
-                if (current == null || !route.equals("/api/jobs/" + current.id)) send(exchange, 404, error("Refresh job not found."));
+                if (current == null || !owner.equals(current.owner) || !route.equals("/api/jobs/" + current.id)) send(exchange, 404, error("Refresh job not found."));
                 else send(exchange, 200, current.json());
             } else if (method.equals("POST") && route.equals("/api/refresh")) {
                 if (!writing.compareAndSet(false, true)) { send(exchange, 409, error("Another operation is in progress.")); return; }
                 RefreshJob current = new RefreshJob();
+                current.owner = owner;
                 job = current;
                 refreshWorker.submit(() -> {
                     try {
@@ -112,6 +172,11 @@ public class WebServer {
                         if (quantity <= 0) throw new IllegalArgumentException("Quantity must be a positive whole number.");
                         String side = body.optString("side");
                         if (!side.equals("BUY") && !side.equals("SELL")) throw new IllegalArgumentException("Choose buy or sell.");
+                        if (manager instanceof HostedStockManager hosted) {
+                            hosted.recordTrade(side, symbol, quantity);
+                            send(exchange, 200, new JSONObject().put("message", (side.equals("BUY") ? "Buy" : "Sale") + " recorded: " + quantity + " " + symbol + " shares."));
+                            return;
+                        }
                         double price;
                         if (side.equals("BUY")) price = manager.storeLiveStock(symbol);
                         else {
@@ -182,12 +247,16 @@ public class WebServer {
     public static void main(String[] args) throws Exception {
         List<String> options = Arrays.asList(args);
         boolean demo = options.contains("--demo");
-        int port = 8080;
+        boolean hosted = options.contains("--hosted");
+        int port = hosted ? Integer.parseInt(System.getenv().getOrDefault("PORT", "10000")) : 8080;
         if (options.contains("--port")) port = Integer.parseInt(options.get(options.indexOf("--port") + 1));
         Path assets = Path.of(options.contains("--assets") ? options.get(options.indexOf("--assets") + 1) : "web/dist");
-        WebServer app = new WebServer(port, assets, demo);
+        String publicOrigin = hosted ? Objects.requireNonNull(System.getenv("FOLIO_PUBLIC_ORIGIN"), "Set FOLIO_PUBLIC_ORIGIN for hosted mode.") : null;
+        if (hosted) DatabaseConnection.validateHostedConfiguration();
+        if (hosted && "true".equals(System.getenv("FOLIO_INIT_SCHEMA"))) HostedSchema.main(new String[0]);
+        WebServer app = new WebServer(port, assets, demo, publicOrigin);
         Runtime.getRuntime().addShutdownHook(new Thread(app::stop));
         app.start();
-        System.out.println("Portfolio web: http://127.0.0.1:" + port + " (" + (demo ? "DEMO - sample data, no database access" : "connected to your configured database") + ")");
+        System.out.println("Portfolio server listening on port " + port + " (" + (hosted ? "hosted, authentication required" : demo ? "DEMO" : "local") + ")");
     }
 }

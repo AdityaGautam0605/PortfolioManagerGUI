@@ -18,7 +18,7 @@ $oldAlpha = $env:ALPHAVANTAGE_API_KEY
 try {
     $env:FINNHUB_API_KEY = 'test-only'
     $env:ALPHAVANTAGE_API_KEY = 'test-only'
-    foreach ($test in @('StockManagerChecks', 'StockApiChecks', 'UiChecks')) {
+    foreach ($test in @('StockManagerChecks', 'portfolioManagerGUI.StockApiChecks', 'HistoryCacheChecks', 'UiChecks')) {
         & (Join-Path $Jdk 'bin/java.exe') --enable-native-access=javafx.graphics --module-path $JavaFx --add-modules javafx.controls,javafx.swing -cp "$out;$JsonJar" $test $out
         if ($LASTEXITCODE -ne 0) { throw "$test failed" }
     }
