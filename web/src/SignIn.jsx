@@ -127,7 +127,10 @@ export default function SignIn({ onSignedIn }) {
       </>}
       {step === 'login' && <>
         {field('password','Password',{ type: 'password', autoComplete: 'current-password' })}
-        <button type="button" className="auth-link" disabled={pending} onClick={() => move('reset')}>Forgot password?</button>
+        <div className="auth-account-links">
+          <button type="button" className="auth-link" disabled={pending} onClick={() => move('reset')}>Forgot password?</button>
+          <button type="button" className="auth-link" disabled={pending} onClick={() => move('signup')}>Create an account</button>
+        </div>
       </>}
       {step === 'verify' && <>
         {field('code','Email code',{ autoComplete: 'one-time-code', autoCapitalize: 'none', spellCheck: false })}
@@ -142,9 +145,9 @@ export default function SignIn({ onSignedIn }) {
       {options?.googleClientId && <button className="button" disabled={pending || !googleReady} onClick={googleSignIn}>Continue with Google</button>}
       <button className="button" disabled={pending} onClick={() => move('email')}>Sign in with an email code</button>
     </div>}
-    <button className="auth-switch auth-link" disabled={pending} onClick={() => move(step === 'login' ? 'signup' : 'login')}>
-      {step === 'signup' ? 'Already have an account? Sign in' : step === 'login' ? 'New user? Create an account' : 'Back to sign in'}
-    </button>
+    {step !== 'login' && <button className="auth-switch auth-link" disabled={pending} onClick={() => move('login')}>
+      {step === 'signup' ? 'Already have an account? Sign in' : 'Back to sign in'}
+    </button>}
     {step === 'verify' && <button className="auth-link" disabled={pending} onClick={() => {
       setStep(purpose); setError(''); setFields({ ...fields, code: '' });
     }}>Change email or request another code</button>}

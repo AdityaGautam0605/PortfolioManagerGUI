@@ -1995,8 +1995,11 @@ kbd {
 .auth-names label:last-child { grid-column: 1 / -1; }
 .auth-methods { display: grid; gap: 8px; }
 .auth-link { color: var(--text); background: transparent; border: 0; padding: 6px 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.auth-account-links { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.auth-account-links .auth-link { font-size: .875rem; min-height: 40px; }
 .auth-switch { display: block; margin-top: 12px; }
 @media (max-width: 440px) {
+  body:has(.auth-shell) { min-width: 0; }
   .auth-shell { padding: 12px; }
   .auth-names { grid-template-columns: 1fr; }
 }

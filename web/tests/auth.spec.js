@@ -23,7 +23,17 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
   await page.screenshot({ path: 'test-results/hosted-signin-desktop.png', fullPage: true });
-  await page.getByRole('button', { name: 'New user? Create an account' }).click();
+  await page.setViewportSize({ width: 320, height: 640 });
+  const forgot = page.getByRole('button', { name: 'Forgot password?' });
+  const signup = page.getByRole('button', { name: 'Create an account', exact: true });
+  const left = await forgot.boundingBox();
+  const right = await signup.boundingBox();
+  expect(left.y).toBe(right.y);
+  expect(left.x + left.width).toBeLessThan(right.x);
+  expect(right.x + right.width).toBeLessThanOrEqual(320);
+  await forgot.click();
+  await page.getByRole('button', { name: 'Back to sign in' }).click();
+  await signup.click();
   await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
   await page.getByLabel('Email address').fill('alice@example.com');
   await page.getByLabel('First name').fill('Alice');
