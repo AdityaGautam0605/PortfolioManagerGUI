@@ -27,3 +27,18 @@ CREATE TABLE IF NOT EXISTS folio_entries (
   buy_price DECIMAL(20,6) NOT NULL,
   FOREIGN KEY (owner_id, symbol) REFERENCES folio_stocks(owner_id, symbol) ON DELETE CASCADE
 );
+
+ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS email VARCHAR(254);
+ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
+ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS middle_name VARCHAR(100);
+ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
+ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255);
+CREATE UNIQUE INDEX IF NOT EXISTS folio_email_idx ON folio_accounts(email);
+CREATE UNIQUE INDEX IF NOT EXISTS folio_google_idx ON folio_accounts(google_sub);
+CREATE TABLE IF NOT EXISTS folio_auth_codes (
+  token_hash VARCHAR(64) PRIMARY KEY,
+  email VARCHAR(254) NOT NULL,
+  purpose VARCHAR(16) NOT NULL,
+  google_sub VARCHAR(255),
+  expires_at TIMESTAMP NOT NULL
+);

@@ -34,7 +34,7 @@ public final class HostedAuth {
     }
     private static byte[] random(int size) { byte[] bytes = new byte[size]; RANDOM.nextBytes(bytes); return bytes; }
     static String passwordHash(String password, String salt) {
-        if (password.length() < 12 || password.length() > 128) throw new IllegalArgumentException("Use a password between 12 and 128 characters.");
+        if (password.length() < 12 || password.codePointCount(0,password.length()) > 128) throw new IllegalArgumentException("Invalid password length.");
         PBEKeySpec spec = new PBEKeySpec(password.toCharArray(), Base64.getDecoder().decode(salt), ITERATIONS, 256);
         try { return Base64.getEncoder().encodeToString(SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).getEncoded()); }
         catch (GeneralSecurityException e) { throw new IllegalStateException("Password hashing unavailable.", e); }
@@ -66,13 +66,15 @@ public final class HostedAuth {
         }
     }
     Login login(String name, String password) throws SQLException {
-        name = username(name);
+        name = name.strip().toLowerCase(Locale.ROOT);
         try (var conn = connections.open()) {
+            conn.setAutoCommit(false);
             String salt = Base64.getEncoder().encodeToString(new byte[16]);
             String expected = "";
             Account account = null;
-            try (var stmt = conn.prepareStatement("SELECT id, username, password_hash, salt FROM folio_accounts WHERE username = ?")) {
+            try (var stmt = conn.prepareStatement("SELECT id, username, password_hash, salt FROM folio_accounts WHERE username = ? OR email = ? FOR UPDATE")) {
                 stmt.setString(1, name);
+                stmt.setString(2, name);
                 try (var rs = stmt.executeQuery()) {
                     if (rs.next()) { account = new Account(rs.getString("id"), rs.getString("username")); salt = rs.getString("salt"); expected = rs.getString("password_hash"); }
                 }
@@ -80,12 +82,12 @@ public final class HostedAuth {
             String actual = passwordHash(password, salt);
             boolean valid = MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.UTF_8), actual.getBytes(java.nio.charset.StandardCharsets.UTF_8));
             if (account == null || !valid) return null;
-            conn.setAutoCommit(false);
             try { Login login = session(conn, account); conn.commit(); return login; }
             catch (SQLException | RuntimeException e) { conn.rollback(); throw e; }
         }
     }
-    private Login session(Connection conn, Account account) throws SQLException {
+    static String newSalt() { return Base64.getEncoder().encodeToString(random(16)); }
+    Login session(Connection conn, Account account) throws SQLException {
         // Serializes simultaneous sign-ins and limits each account to one active session.
         try (var stmt = conn.prepareStatement("SELECT id FROM folio_accounts WHERE id = ? FOR UPDATE")) {
             stmt.setString(1, account.id()); try (var rs = stmt.executeQuery()) { if (!rs.next()) throw new SQLException("Missing account."); }

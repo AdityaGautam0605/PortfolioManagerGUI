@@ -1984,3 +1984,19 @@ kbd {
   .holdings-page .table-footnote { padding: 10px 12px; }
   .holdings-page .empty { padding: 24px 14px; gap: 8px; }
 }
+
+.auth-panel { padding: clamp(22px, 5vw, 36px); }
+.auth-brand { font-size: 24px; font-weight: 700; letter-spacing: -.06em; }
+.auth-panel h1 { margin: 18px 0 8px; font-size: clamp(26px, 5vw, 34px); }
+.auth-panel h1:focus { outline: none; }
+.auth-panel form { margin-top: 20px; }
+.auth-panel .auth-field { display: grid; gap: 6px; min-width: 0; }
+.auth-names { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth-names label:last-child { grid-column: 1 / -1; }
+.auth-methods { display: grid; gap: 8px; }
+.auth-link { color: var(--text); background: transparent; border: 0; padding: 6px 0; text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.auth-switch { display: block; margin-top: 12px; }
+@media (max-width: 440px) {
+  .auth-shell { padding: 12px; }
+  .auth-names { grid-template-columns: 1fr; }
+}

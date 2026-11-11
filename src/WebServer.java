@@ -17,6 +17,7 @@ public class WebServer {
     private final boolean demo;
     private final String publicOrigin;
     private final HostedAuth auth;
+    private final HostedIdentity identity;
     private final Path assets;
     private final AtomicBoolean writing = new AtomicBoolean();
     private final ExecutorService workers = Executors.newFixedThreadPool(8);
@@ -52,6 +53,7 @@ public class WebServer {
         }
         this.publicOrigin = publicOrigin;
         this.auth = publicOrigin == null ? null : new HostedAuth();
+        this.identity = auth == null ? null : new HostedIdentity(auth, publicOrigin);
         this.demo = demo;
         this.manager = demo ? new DemoStockManager() : new StockManager();
         this.assets = assets.toAbsolutePath().normalize();
@@ -88,19 +90,22 @@ public class WebServer {
             HostedAuth.Account account = null;
             if (auth != null) {
                 String token = HostedAuth.token(exchange.getRequestHeaders().getFirst("Cookie"));
-                if (method.equals("POST") && (route.equals("/api/auth/login") || route.equals("/api/auth/register"))) {
+                if (method.equals("GET") && route.equals("/api/auth/options")) {
+                    send(exchange, 200, identity.options()); return;
+                }
+                if (method.equals("POST") && Set.of("/api/auth/login","/api/auth/register","/api/auth/send-code","/api/auth/verify","/api/auth/google").contains(route)) {
                     if (!auth.allowAttempt()) {
                         exchange.getResponseHeaders().set("Retry-After", "60");
                         send(exchange, 429, error("Too many sign-in attempts. Please wait a minute.")); return;
                     }
                     JSONObject body = readBody(exchange);
-                    HostedAuth.Login login;
-                    try {
-                        login = route.endsWith("/register")
-                                ? auth.register(body.optString("username"), body.optString("password"))
-                                : auth.login(body.optString("username"), body.optString("password"));
-                    } catch (OperationException e) { send(exchange, 409, error(e.getMessage())); return; }
-                    if (login == null) { send(exchange, 401, error("Incorrect username or password.")); return; }
+                    if (!route.endsWith("/login")) {
+                        var result = identity.handle(route.substring("/api/auth/".length()), body);
+                        if (result.login() != null) exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(result.login().token()));
+                        send(exchange, 200, result.json()); return;
+                    }
+                    var login = auth.login(body.optString("username"), body.optString("password"));
+                    if (login == null) { send(exchange, 401, error("Incorrect email, username, or password.")); return; }
                     exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(login.token()));
                     send(exchange, 200, new JSONObject().put("message", "Signed in.")); return;
                 }

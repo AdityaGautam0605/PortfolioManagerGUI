@@ -29,6 +29,29 @@ public final class HostedChecks {
         HostedSchema.main(new String[0]);
         HostedSchema.main(new String[0]);
         var auth = new HostedAuth();
+        var identity = new HostedIdentity(auth,"https://folio.example");
+        String signupCode, resetCode, emailCode;
+        String address = "test@example.com";
+        try (var conn = DatabaseConnection.getConnection()) {
+            signupCode = HostedIdentity.issue(conn,address,"signup",null);
+            resetCode = HostedIdentity.issue(conn,address,"reset",null);
+            emailCode = HostedIdentity.issue(conn,address,"email",null);
+        }
+        var proof = new JSONObject().put("code",signupCode).put("purpose","signup");
+        var ticket = identity.handle("verify",proof).json().getString("ticket");
+        boolean replay = false;
+        try { identity.handle("verify",proof); } catch (IllegalArgumentException expected) { replay = true; }
+        check(replay,"Email verification code cannot be replayed");
+        var profile = new JSONObject().put("ticket",ticket).put("firstName","Alex").put("lastName","Lee")
+                .put("username","alex").put("password","three unrelated words");
+        var created = identity.handle("register",profile).login();
+        check(created.account().username().equals("alex"),"Verified signup creates chosen username");
+        check(auth.login(address,"three unrelated words")!=null,"Verified email and password sign in");
+        var codeLogin = identity.handle("verify",new JSONObject().put("code",emailCode).put("purpose","email")).login();
+        check(auth.authenticate(codeLogin.token())!=null,"Email code starts a session");
+        identity.handle("verify",new JSONObject().put("code",resetCode).put("purpose","reset").put("password","a different long password"));
+        check(auth.authenticate(codeLogin.token())==null && auth.login(address,"three unrelated words")==null,"Reset revokes session and old password");
+        check(auth.login(address,"a different long password")!=null,"Reset password signs in");
         var alice = auth.register("Alice", "a-strong-test-password");
         var bob = auth.register("bob", "b-strong-test-password");
         check(auth.authenticate(alice.token()).username().equals("alice"), "Login token resolves its owner");

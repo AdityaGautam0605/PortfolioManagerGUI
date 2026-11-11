@@ -55,7 +55,9 @@ The `/api/health` endpoint checks that the Java process is reachable, not databa
 ## Existing holdings and operational limits
 
 - Local data is not imported automatically. After creating your account, an explicit, reviewed import can copy your existing holdings into that account. Do not populate another account based on a browser-supplied owner ID.
-- Accounts use usernames and passwords (12–128 characters), salted PBKDF2 hashes, and one active 24-hour session per account. Signing in again invalidates the earlier session. Password reset/email verification and account administration are not implemented yet; save your password.
+- New accounts verify their email and choose a username. Password signup and reset accept 15–128 characters. Existing username/password accounts keep their original credentials. Accounts without a verified email cannot receive reset codes.
+- In Render, set `RESEND_API_KEY` and `FOLIO_EMAIL_FROM` (a sender on your verified Resend domain) for signup, email-code sign-in and password recovery. Codes expire after ten minutes. Completing a reset revokes active sessions.
+- For Google, create a Web application OAuth client, add the exact `FOLIO_PUBLIC_ORIGIN` as an authorized JavaScript origin and authorized redirect URI, then set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Render. Restart the service after changing settings. Accounts created with email use their original sign-in methods if a Google account has the same address.
 - Registration is open. This setup is for a small project rollout, not a fully hardened public financial service. Authentication has a global limit of 20 attempts/minute per running server; it is not a distributed abuse-prevention service.
 - Hosted trades lock the account row in a database transaction. The app still records holdings; it does not execute brokerage orders.
 - Watchlists are stored per account in the current browser, not synced across devices. Theme preference is per browser origin.
