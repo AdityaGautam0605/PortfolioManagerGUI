@@ -33,6 +33,8 @@ ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS first_name VARCHAR(100);
 ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS middle_name VARCHAR(100);
 ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS last_name VARCHAR(100);
 ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS google_sub VARCHAR(255);
+ALTER TABLE folio_accounts ADD COLUMN IF NOT EXISTS firebase_uid VARCHAR(128);
+CREATE UNIQUE INDEX IF NOT EXISTS folio_firebase_idx ON folio_accounts(firebase_uid);
 CREATE UNIQUE INDEX IF NOT EXISTS folio_email_idx ON folio_accounts(email);
 CREATE UNIQUE INDEX IF NOT EXISTS folio_google_idx ON folio_accounts(google_sub);
 CREATE TABLE IF NOT EXISTS folio_auth_codes (

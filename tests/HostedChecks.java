@@ -22,6 +22,34 @@ public final class HostedChecks {
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
         return HttpClient.newHttpClient().send(builder.build(), HttpResponse.BodyHandlers.ofString());
     }
+    private static void checkFirebase(HostedAuth auth) throws Exception {
+        String email = "firebase@example.com";
+        var profile = new JSONObject().put("email",email).put("localId","firebase-owner").put("emailVerified",false);
+        var mail = new ArrayList<String>();
+        var identity = new HostedIdentity(auth,"https://folio.example",(method,body) -> switch (method) {
+            case "lookup" -> new JSONObject().put("users",new JSONArray().put(profile));
+            case "signUp","signInWithPassword" -> new JSONObject().put("localId",profile.getString("localId")).put("idToken","test");
+            case "sendOobCode" -> { mail.add(body.getString("requestType")); yield new JSONObject(); }
+            default -> throw new AssertionError(method);
+        });
+        var input = new JSONObject().put("email",email).put("password","testing the email flow");
+        var pending = identity.firebaseFlow("firebase-signup",input);
+        check(pending.login()==null && pending.json().getBoolean("awaitingVerification"),"Unverified user cannot get a session");
+        identity.firebaseFlow("firebase-check",input);
+        check(mail.equals(List.of("VERIFY_EMAIL")),"Checking verification does not resend email");
+        profile.put("emailVerified",true);
+        var ticket = identity.firebaseFlow("firebase-check",input).json().getString("ticket");
+        var registration = new JSONObject().put("firebase",true).put("ticket",ticket).put("username","firebase_user").put("firstName","Faye").put("lastName","Lee");
+        var created = identity.handle("register",registration).login();
+        check(identity.firebaseLoginEmail("firebase_user").equals(email),"Username resolves to Firebase email");
+        check(identity.firebaseFlow("firebase-login",input).login().account().equals(created.account()),"Firebase login retains portfolio owner");
+        profile.put("localId","different-owner");
+        boolean collision = false;
+        try { identity.firebaseFlow("firebase-login",input); } catch (IllegalArgumentException expected) { collision = true; }
+        check(collision,"A different Firebase UID cannot claim an existing portfolio");
+        identity.firebaseFlow("firebase-reset",input);
+        check(mail.contains("PASSWORD_RESET"),"Requests Firebase password reset link");
+    }
     public static void main(String[] args) throws Exception {
         String url = System.getenv().getOrDefault("DB_URL", "");
         boolean postgres = url.matches("jdbc:postgresql://127[.]0[.]0[.]1:[0-9]+/folio_hosted_checks_[a-f0-9]{12}[?]sslmode=disable");
@@ -29,6 +57,7 @@ public final class HostedChecks {
         HostedSchema.main(new String[0]);
         HostedSchema.main(new String[0]);
         var auth = new HostedAuth();
+        checkFirebase(auth);
         var identity = new HostedIdentity(auth,"https://folio.example");
         String signupCode, resetCode, emailCode;
         String address = "test@example.com";

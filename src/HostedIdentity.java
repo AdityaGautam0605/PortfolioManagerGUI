@@ -15,12 +15,17 @@ final class HostedIdentity {
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
     private final HostedAuth auth;
     private final String origin;
-    HostedIdentity(HostedAuth auth, String origin) { this.auth = auth; this.origin = origin; }
+    private final java.util.function.BiFunction<String,JSONObject,JSONObject> firebase;
+    HostedIdentity(HostedAuth auth, String origin) { this(auth, origin, HostedIdentity::firebaseRequest); }
+    HostedIdentity(HostedAuth auth, String origin, java.util.function.BiFunction<String,JSONObject,JSONObject> firebase) {
+        this.auth = auth; this.origin = origin; this.firebase = firebase;
+    }
 
     private static String env(String key) { return System.getenv().getOrDefault(key, "").strip(); }
     JSONObject options() {
         boolean google = !env("GOOGLE_CLIENT_ID").isEmpty() && !env("GOOGLE_CLIENT_SECRET").isEmpty();
         return new JSONObject().put("googleClientId", google ? env("GOOGLE_CLIENT_ID") : "")
+                .put("firebaseEnabled", !env("FOLIO_FIREBASE_WEB_KEY").isEmpty())
                 .put("emailEnabled", !env("RESEND_API_KEY").isEmpty() && !env("FOLIO_EMAIL_FROM").isEmpty());
     }
     static String email(String raw) {
@@ -122,6 +127,81 @@ final class HostedIdentity {
         return new Proof(email(info.getString("email")), info.getString("sub"));
     }
     private static String encode(String text) { return URLEncoder.encode(text,StandardCharsets.UTF_8); }
+    private static JSONObject firebaseRequest(String method, JSONObject body) {
+        String key = env("FOLIO_FIREBASE_WEB_KEY");
+        if (key.isEmpty()) throw new OperationException("Firebase email sign-in is unavailable.");
+        var response = send(HttpRequest.newBuilder(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:" + method + "?key=" + encode(key)))
+                .header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString())));
+        if (response.statusCode()/100 == 2) return new JSONObject(response.body());
+        if (response.statusCode() == 400) {
+            JSONObject detail = new JSONObject(response.body()).optJSONObject("error");
+            String reason = detail == null ? "" : detail.optString("message");
+            if (method.equals("signUp") && reason.equals("EMAIL_EXISTS")) return new JSONObject().put("existing",true);
+            if (method.equals("sendOobCode") && reason.equals("EMAIL_NOT_FOUND") && body.optString("requestType").equals("PASSWORD_RESET")) return new JSONObject();
+            if (Set.of("INVALID_LOGIN_CREDENTIALS","EMAIL_NOT_FOUND","INVALID_PASSWORD","USER_DISABLED").contains(reason))
+                throw new IllegalArgumentException("Incorrect email, username, or password.");
+            if (reason.startsWith("TOO_MANY_ATTEMPTS") || reason.contains("QUOTA_EXCEEDED"))
+                throw new OperationException("Firebase's email or sign-in limit was reached. Try again later.");
+        }
+        throw new OperationException("Firebase could not complete this request. Please try again later.");
+    }
+    // Existing usernames and emails always resolve to their original provider.
+    String firebaseLoginEmail(String identifier) throws SQLException {
+        String value = identifier.strip().toLowerCase(Locale.ROOT);
+        try (var conn = DatabaseConnection.getConnection(); var stmt = conn.prepareStatement("SELECT email,firebase_uid FROM folio_accounts WHERE email=? OR username=?")) {
+            stmt.setString(1,value); stmt.setString(2,value);
+            try (var rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getString("firebase_uid") == null ? null : rs.getString("email");
+            }
+        }
+        return value.contains("@") ? email(value) : null;
+    }
+    Result firebaseFlow(String route, JSONObject body) throws SQLException {
+        String address = email(body.optString("email"));
+        if (route.equals("firebase-reset")) {
+            firebase.apply("sendOobCode", new JSONObject().put("requestType","PASSWORD_RESET").put("email",address).put("continueUrl",origin));
+            return new Result(new JSONObject().put("sent",true),null);
+        }
+        String password = body.optString("password");
+        var credentials = new JSONObject().put("email",address).put("password",password).put("returnSecureToken",true);
+        JSONObject tokens = null;
+        if (route.equals("firebase-signup")) {
+            passwordPolicy(password);
+            if (firebaseLoginEmail(address)==null) throw new IllegalArgumentException("Use the original sign-in method for this account.");
+            tokens = firebase.apply("signUp",credentials);
+        }
+        if (tokens == null || tokens.optBoolean("existing")) tokens = firebase.apply("signInWithPassword",credentials);
+        var token = new JSONObject().put("idToken",tokens.getString("idToken"));
+        JSONObject profile = firebase.apply("lookup",token).getJSONArray("users").getJSONObject(0);
+        String uid = profile.getString("localId");
+        if (!address.equals(email(profile.getString("email"))) || !uid.equals(tokens.getString("localId")))
+            throw new IllegalArgumentException("Firebase could not confirm this account.");
+        if (!profile.optBoolean("emailVerified")) {
+            boolean sendLink = !route.equals("firebase-check");
+            if (sendLink) firebase.apply("sendOobCode",new JSONObject(token.toString()).put("requestType","VERIFY_EMAIL").put("continueUrl",origin));
+            return new Result(new JSONObject().put("awaitingVerification",true).put("linkSent",sendLink).put("email",address),null);
+        }
+        try (var conn = DatabaseConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try {
+                Result result;
+                try (var find = conn.prepareStatement("SELECT id,username,firebase_uid FROM folio_accounts WHERE email=? OR firebase_uid=? FOR UPDATE")) {
+                    find.setString(1,address); find.setString(2,uid);
+                    try (var rs = find.executeQuery()) {
+                        if (rs.next()) {
+                            if (!uid.equals(rs.getString("firebase_uid"))) throw new IllegalArgumentException("Use the original sign-in method for this account.");
+                            var account = new HostedAuth.Account(rs.getString("id"),rs.getString("username"));
+                            result = new Result(new JSONObject().put("signedIn",true),auth.session(conn,account));
+                        } else {
+                            result = new Result(new JSONObject().put("ticket",issue(conn,address,"firebase-enroll",uid))
+                                    .put("firebase",true).put("email",address),null);
+                        }
+                    }
+                }
+                conn.commit(); return result;
+            } catch (SQLException | RuntimeException e) { conn.rollback(); throw e; }
+        }
+    }
     record Result(JSONObject json, HostedAuth.Login login) {}
     Result handle(String route, JSONObject body) throws SQLException {
         if (route.equals("send-code")) { mail(body); return new Result(new JSONObject().put("sent",true), null); }
@@ -180,16 +260,17 @@ final class HostedIdentity {
         return new Result(new JSONObject().put("ticket",issue(conn,proof.email(),"enroll",proof.subject())).put("email",proof.email()),null);
     }
     private Result finish(Connection conn,JSONObject body) throws SQLException {
-        Proof proof = consume(conn,body.optString("ticket"),"enroll");
-        boolean regular = proof.subject()==null;
+        boolean firebaseAccount = body.optBoolean("firebase");
+        Proof proof = consume(conn,body.optString("ticket"),firebaseAccount ? "firebase-enroll" : "enroll");
+        boolean regular = !firebaseAccount && proof.subject()==null;
         String password = regular ? body.optString("password") : secret();
         if (regular) passwordPolicy(password);
         String salt = HostedAuth.newSalt();
         var account = new HostedAuth.Account(UUID.randomUUID().toString(),HostedAuth.username(body.optString("username")));
-        try (var insert = conn.prepareStatement("INSERT INTO folio_accounts(id,username,email,google_sub,first_name,middle_name,last_name,salt,password_hash) VALUES(?,?,?,?,?,?,?,?,?)")) {
-            insert.setString(1,account.id()); insert.setString(2,account.username()); insert.setString(3,proof.email()); insert.setString(4,proof.subject());
-            insert.setString(5,name(body,"firstName",regular)); insert.setString(6,name(body,"middleName",false)); insert.setString(7,name(body,"lastName",regular));
-            insert.setString(8,salt); insert.setString(9,HostedAuth.passwordHash(password,salt)); insert.executeUpdate();
+        try (var insert = conn.prepareStatement("INSERT INTO folio_accounts(id,username,email,google_sub,first_name,middle_name,last_name,salt,password_hash,firebase_uid) VALUES(?,?,?,?,?,?,?,?,?,?)")) {
+            insert.setString(1,account.id()); insert.setString(2,account.username()); insert.setString(3,proof.email()); insert.setString(4,firebaseAccount ? null : proof.subject());
+            insert.setString(5,name(body,"firstName",regular || firebaseAccount)); insert.setString(6,name(body,"middleName",false)); insert.setString(7,name(body,"lastName",regular || firebaseAccount));
+            insert.setString(8,salt); insert.setString(9,HostedAuth.passwordHash(password,salt)); insert.setString(10,firebaseAccount ? proof.subject() : null); insert.executeUpdate();
         }
         return new Result(new JSONObject().put("signedIn",true),auth.session(conn,account));
     }

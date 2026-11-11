@@ -2,6 +2,43 @@ import { test, expect } from '@playwright/test';
 
 const snapshot = { mode: 'hosted', account: { id: 'test-alice', username: 'alice' }, positions: [], stocks: [], loadedAt: new Date().toISOString() };
 
+test('Firebase signup opens a verification link step and resumes username setup', async ({ page }) => {
+  await page.route('**/api/snapshot', route => route.fulfill({ status: 401, json: {} }));
+  await page.route('**/api/auth/options', route => route.fulfill({ json: { firebaseEnabled: true, emailEnabled: false } }));
+  const email = 'alex@example.com';
+  await page.route('**/api/auth/firebase-signup', route => route.fulfill({ json: { awaitingVerification: true, linkSent: true, email } }));
+  await page.route('**/api/auth/firebase-check', route => route.fulfill({ json: { ticket: 'test', firebase: true, email } }));
+  await page.route('**/api/auth/firebase-reset', route => route.fulfill({ json: { sent: true } }));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Forgot password?' }).click();
+  await page.getByLabel('Email address').fill(email);
+  await page.getByRole('button', { name: 'Send reset link' }).click();
+  await expect(page.getByRole('status')).toContainText('reset link');
+  await page.getByRole('button', { name: 'Create an account' }).click();
+  await page.getByLabel('Email address').fill(email);
+  await page.getByLabel('First name').fill('Alex');
+  await page.getByLabel('Last name').fill('Lee');
+  await page.getByLabel('Password', { exact: true }).fill('a secure test password');
+  await page.getByRole('button', { name: 'Verify email' }).click();
+  await expect(page.getByText('Open the verification link', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'I verified my email' }).click();
+  await expect(page.getByLabel('Username', { exact: true })).toBeVisible();
+});
+
+test('unconfigured email leaves password login and Google signup available', async ({ page }) => {
+  await page.route('**/api/snapshot', route => route.fulfill({ status: 401, json: {} }));
+  await page.route('**/api/auth/options', route => route.fulfill({ json: { emailEnabled: false, googleClientId: 'test' } }));
+  await page.route('https://accounts.google.com/gsi/client', route => route.fulfill({ body: '' }));
+  await page.goto('/');
+  await expect(page.getByText('Email codes and password resets are currently unavailable.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Forgot password?' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Sign in with an email code' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Create an account' }).click();
+  await expect(page.getByRole('button', { name: 'Continue with Google' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Verify email' })).toHaveCount(0);
+});
+
 test('hosted registration, account identity, logout, and failed login', async ({ page }) => {
   let signedIn = false;
   await page.route('**/api/auth/options', route => route.fulfill({ json: { emailEnabled: true } }));

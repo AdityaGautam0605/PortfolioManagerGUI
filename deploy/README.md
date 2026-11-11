@@ -54,6 +54,8 @@ The `/api/health` endpoint checks that the Java process is reachable, not databa
 
 ## Existing holdings and operational limits
 
+For Folio's Firebase email/password accounts, enable Email/Password in the Firebase console and add the Vercel hostname under Authentication → Settings → Authorized domains. Render reads the public web API key from `FOLIO_FIREBASE_WEB_KEY` in the Blueprint. The Java backend calls the Firebase Authentication REST API. Verification and password reset emails open Firebase's hosted action page and offer a return link to Folio. Set the project's password policy to a minimum of 15 characters for provider-hosted resets. Existing Google and legacy password accounts retain their original sign-in methods. Firebase resets apply to Firebase-managed accounts. Already-issued Folio sessions expire separately.
+
 - Local data is not imported automatically. After creating your account, an explicit, reviewed import can copy your existing holdings into that account. Do not populate another account based on a browser-supplied owner ID.
 - New accounts verify their email and choose a username. Password signup and reset accept 15–128 characters. Existing username/password accounts keep their original credentials. Accounts without a verified email cannot receive reset codes.
 - In Render, set `RESEND_API_KEY` and `FOLIO_EMAIL_FROM` (a sender on your verified Resend domain) for signup, email-code sign-in and password recovery. Codes expire after ten minutes. Completing a reset revokes active sessions.

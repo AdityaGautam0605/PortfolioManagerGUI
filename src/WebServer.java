@@ -93,12 +93,23 @@ public class WebServer {
                 if (method.equals("GET") && route.equals("/api/auth/options")) {
                     send(exchange, 200, identity.options()); return;
                 }
-                if (method.equals("POST") && Set.of("/api/auth/login","/api/auth/register","/api/auth/send-code","/api/auth/verify","/api/auth/google").contains(route)) {
+                if (method.equals("POST") && Set.of("/api/auth/login","/api/auth/register","/api/auth/send-code","/api/auth/verify","/api/auth/google",
+                        "/api/auth/firebase-signup","/api/auth/firebase-reset","/api/auth/firebase-check").contains(route)) {
                     if (!auth.allowAttempt()) {
                         exchange.getResponseHeaders().set("Retry-After", "60");
                         send(exchange, 429, error("Too many sign-in attempts. Please wait a minute.")); return;
                     }
                     JSONObject body = readBody(exchange);
+                    String action = route.substring("/api/auth/".length());
+                    if (action.equals("login") && identity.options().optBoolean("firebaseEnabled")) {
+                        String address = identity.firebaseLoginEmail(body.optString("username"));
+                        if (address != null) { action = "firebase-login"; body.put("email",address); }
+                    }
+                    if (action.startsWith("firebase-")) {
+                        var result = identity.firebaseFlow(action,body);
+                        if (result.login() != null) exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(result.login().token()));
+                        send(exchange,200,result.json()); return;
+                    }
                     if (!route.endsWith("/login")) {
                         var result = identity.handle(route.substring("/api/auth/".length()), body);
                         if (result.login() != null) exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(result.login().token()));
