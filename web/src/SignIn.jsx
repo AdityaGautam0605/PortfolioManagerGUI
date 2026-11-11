@@ -9,7 +9,7 @@ const blankProfile = { email: '', firstName: '', middleName: '', lastName: '', p
 const post = (path, body) => request('/auth/' + path, { method: 'POST', body });
 
 export default function SignIn({ onSignedIn }) {
-  const [step, setStep] = useState('signup');
+  const [step, setStep] = useState('login');
   const [purpose, setPurpose] = useState('');
   const [fields, setFields] = useState(blankProfile);
   const [ticket, setTicket] = useState('');
@@ -143,7 +143,7 @@ export default function SignIn({ onSignedIn }) {
       <button className="button" disabled={pending} onClick={() => move('email')}>Sign in with an email code</button>
     </div>}
     <button className="auth-switch auth-link" disabled={pending} onClick={() => move(step === 'login' ? 'signup' : 'login')}>
-      {step === 'signup' ? 'Already have an account? Sign in' : step === 'login' ? 'New to Folio? Create an account' : 'Back to sign in'}
+      {step === 'signup' ? 'Already have an account? Sign in' : step === 'login' ? 'New user? Create an account' : 'Back to sign in'}
     </button>
     {step === 'verify' && <button className="auth-link" disabled={pending} onClick={() => {
       setStep(purpose); setError(''); setFields({ ...fields, code: '' });

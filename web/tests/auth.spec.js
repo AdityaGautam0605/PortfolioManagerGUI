@@ -21,8 +21,10 @@ test('hosted registration, account identity, logout, and failed login', async ({
   });
   await page.route('**/api/auth/login', route => route.fulfill({ status: 401, json: { error: 'Incorrect username or password.' } }));
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
   await page.screenshot({ path: 'test-results/hosted-signin-desktop.png', fullPage: true });
+  await page.getByRole('button', { name: 'New user? Create an account' }).click();
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
   await page.getByLabel('Email address').fill('alice@example.com');
   await page.getByLabel('First name').fill('Alice');
   await page.getByLabel('Last name').fill('Lee');
@@ -35,7 +37,6 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await expect(page.getByLabel('Account: alice', { exact: true })).toBeVisible();
   await page.getByLabel('Account: alice', { exact: true }).click();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-  await page.getByRole('button', { name: 'Already have an account? Sign in' }).click();
   await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
   await expect(page.locator('.portfolio-value')).toHaveCount(0);
   await page.getByLabel('Email or username').fill('alice');
@@ -56,7 +57,7 @@ test('session expiry unmounts private portfolio data', async ({ page }) => {
   await expect(page.getByLabel('Account: alice', { exact: true })).toBeVisible();
   expired = true;
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
   await expect(page.getByLabel('Account: alice', { exact: true })).toHaveCount(0);
 });
 
