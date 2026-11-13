@@ -35,7 +35,7 @@ function MarketPreview() {
   const min = Math.min(...prices), max = Math.max(...prices);
   const line = prices.map((p,i) => `${i ? 'L' : 'M'}${4+i*472/(prices.length-1)},${123-(p-min)*108/(max-min)}`).join(' ');
   return <section className="market-preview" aria-label="Interactive sample stock chart">
-    <header><span><span className="preview-dot" />Stock explorer</span><small>Sample data</small></header>
+    <header><span><span className="preview-dot" />Stock explorer</span></header>
     <div className="preview-layout">
       <div className="preview-switch" aria-label="Choose an example stock">{samples.map((stock,i)=>
         <button key={stock.symbol} data-motion-part aria-label={stock.symbol} aria-pressed={i===selected} onClick={()=>{select(i); setSession(stock.prices.length-1);}}>
@@ -113,16 +113,22 @@ function ProductOverview() {
   const [weight,setWeight] = useState(50);
   const [years,setYears] = useState(5);
   return <section className="product-overview" aria-labelledby="overview-title">
-    <h2 id="overview-title">What can Folio tell you?</h2>
+    <h2 id="overview-title" className="gradient-heading"><span>What can Folio</span> <span>tell you?</span></h2>
     <div className="overview-insights" data-motion-group>
-      <article data-motion-part><h3>Which holdings drive my returns?</h3><p>A position’s size matters as much as its return. In this example, the stock with the smaller percentage gain contributes more money.</p>
+      <article data-motion-part><div><h3>Which holdings drive my returns?</h3>
+        <p>The biggest percentage gain can come from a small holding. To see which stock moved your balance most, look at how much you had invested when its price changed.</p>
+        <p>Here, a 5% gain on $1,000 earns $50. The smaller holding rises twice as fast and earns $20. Together they gain $70 on $1,200 invested, a portfolio return of about 5.8%.</p></div>
         <dl className="return-example"><div><dt>$1,000 × 5%</dt><dd>+$50</dd></div><div><dt>$200 × 10%</dt><dd>+$20</dd></div></dl>
       </article>
-      <article data-motion-part><h3>How much depends on one stock?</h3><p>Suppose one stock falls 10% while everything else stays flat. Adjust its share of the portfolio to see the impact.</p>
+      <article data-motion-part><div><h3>How much depends on one stock?</h3>
+        <p>A holding’s weight is its share of your portfolio’s current value. That weight can grow as its price rises, even if you never buy another share.</p>
+        <p>Use the slider to change one stock’s weight. If its price falls 10% and your other holdings stay flat, a stock with a 20% weight pulls the portfolio down 2%. At a 50% weight, the same fall costs the portfolio 5%.</p></div>
         <div className="insight-control"><label htmlFor="sample-weight">Position weight <b>{weight}%</b></label><input id="sample-weight" type="range" min="1" max="100" value={weight} onChange={e=>setWeight(Number(e.target.value))}/>
         <div>Portfolio change <output htmlFor="sample-weight">−{(weight/10).toFixed(1)}%</output></div></div>
       </article>
-      <article data-motion-part><h3>What if my returns change?</h3><p>Explore how $1,000 would grow at an assumed 5% annual return, with gains reinvested and no additional deposits.</p>
+      <article data-motion-part><div><h3>How does time affect my returns?</h3>
+        <p>Start with $1,000 and assume it earns 5% each year. In year one, that adds $50. Reinvesting the gain brings the balance to $1,050, so the second year adds $52.50.</p>
+        <p>Move the time horizon to see compounding at work. This example holds the annual rate steady and assumes no additional deposits or withdrawals. Actual stock returns vary from year to year.</p></div>
         <div className="insight-control"><label htmlFor="sample-years">Time horizon <b>{years} {years===1?'year':'years'}</b></label><input id="sample-years" type="range" min="1" max="10" value={years} onChange={e=>setYears(Number(e.target.value))}/>
         <div>Projected value <output htmlFor="sample-years">{(1000*1.05**years).toLocaleString('en-US',{style:'currency',currency:'USD'})}</output></div></div>
       </article>
@@ -179,7 +185,7 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
       <button className="home-theme" aria-label={dark?'Switch to light mode':'Switch to dark mode'} title={dark?'Switch to light mode':'Switch to dark mode'} onClick={()=>setTheme(dark?'light':'dark')}>{dark?<Sun size={19}/>:<Moon size={19}/>}</button>
       <a className="home-signin" href="#/signin">Sign in <ArrowRight size={15}/></a></header>
     <main ref={tour}>{libraryPage ? <Discover full/> : <><section className="home-hero"><div className="home-intro">
-      <h1><span>Know the stocks</span> <em>you own.</em></h1>
+      <h1 className="gradient-heading"><span>Know the stocks</span> <span>you own.</span></h1>
       <p>Folio is a portfolio tracker for stocks across the US, India and Canada. Keep a watchlist of companies you’re researching and see how the shares you own perform together.</p>
       <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><a className="explore-link" href="#/library">Explore stocks →</a></div>
     </div><div className="market-stage" data-motion-group><MarketPreview/></div></section><ProductOverview/><Discover/><TradeExample/></>}
