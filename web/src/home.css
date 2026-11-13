@@ -1,7 +1,7 @@
 .home-page { --ink:#f4f4f5; --dim:#b4b4bb; --page:#000; --panel:#080808; --line:#303030; --accent:#ccccd2; color:var(--ink); background:var(--page); --gain:#71d9a1; --loss:#ff9999; color-scheme:dark; min-height:100dvh; }
 .home-wrap { width:100%; padding-inline:clamp(16px,3vw,56px); }
 .home-header,.home-header nav,.home-signin,.home-cta,.home-coverage>div,.market-preview header,.preview-quote,.preview-caption,.home-start { display:flex; align-items:center; }
-.home-header { gap:18px; padding:17px 0; border-bottom:1px solid var(--line); }
+.home-header { gap:18px; padding:17px 0; }
 .home-header .brand { color:var(--ink); }
 .home-header nav { margin-left:auto; gap:24px; }
 .home-header nav button { padding:8px 0; background:transparent; color:var(--dim); }
@@ -39,7 +39,7 @@
 .home-cta { background:var(--ink); color:var(--page); }
 .home-cta:hover { background:var(--accent); }
 .home-header nav button:hover,.hero-actions button:hover,.catalog-more:hover { color:var(--accent); }
-.discovery { border-block:1px solid var(--line); padding:32px 0; }
+.discovery { padding:32px 0; }
 .home-page h2 { font-size:clamp(25px,3vw,40px); letter-spacing:-.05em; line-height:1.15; }
 .discovery p,.trade-example p { color:var(--dim); line-height:1.6; margin:8px 0; }
 .section-heading,.directory-toolbar { justify-content:space-between; }
@@ -94,7 +94,7 @@
 .company-row span+span { color:var(--dim); font-size:12px; text-align:right; }
 .company-row:focus-visible { outline-offset:-3px; }
 .listing-details { display:grid; gap:8px; padding:12px 18px; font-size:14px; }
-.product-overview { border-top:1px solid var(--line); padding:32px 0; }
+.product-overview { padding:32px 0; }
 .overview-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(16px,3vw,48px); margin-top:20px; }
 .overview-insights h3 { font-size:18px; line-height:1.35; }
 .overview-insights p { max-width:54ch; margin:8px 0 0; color:var(--dim); line-height:1.6; }
@@ -113,7 +113,7 @@
 .home-intro h1 { grid-column:1/-1; font-size:clamp(50px,7vw,116px); max-width:19ch; line-height:.97; font-weight:500; }
 .home-intro h1 em { display:inline-block; font:inherit; color:var(--dim); }
 .home-intro p { margin:0; max-width:62ch; }
-.market-stage { margin-top:clamp(22px,3vw,44px); padding:clamp(12px,3vw,42px); border:1px solid var(--line); background:var(--page); background-image:radial-gradient(var(--line) .8px,transparent .8px); background-size:12px 12px; }
+.market-stage { margin-top:clamp(22px,3vw,44px); padding-block:clamp(8px,2vw,24px); }
 .market-preview { width:min(100%,1200px); margin-inline:auto; border-radius:10px; }
 .preview-layout { display:grid; grid-template-columns:minmax(170px,1fr) minmax(0,3fr); }
 .preview-layout .preview-switch { display:grid; align-content:center; gap:10px; padding:16px; border-right:1px solid var(--line); }
@@ -122,9 +122,9 @@
 .preview-switch button small { color:inherit; }.preview-body svg { height:clamp(100px,12vw,175px); }
 .session-slider,.insight-control input { width:100%; accent-color:var(--ink); cursor:pointer; }
 .session-slider { display:block; margin:6px 0; }
-.overview-insights { gap:0; border-block:1px solid var(--line); }
-.overview-insights article { display:flex; flex-direction:column; padding:clamp(18px,2.3vw,36px); }
-.overview-insights article+article { border-inline-start:1px solid var(--line); }
+.overview-insights { gap:clamp(16px,2vw,32px); }
+.overview-insights article { display:flex; flex-direction:column; padding-block:16px; }
+
 .overview-insights h3 { font-size:clamp(20px,2vw,30px); letter-spacing:-.04em; }
 .overview-insights p { margin-bottom:24px; }
 .return-example,.insight-control { margin:auto 0 0; font-variant-numeric:tabular-nums; }
@@ -162,5 +162,7 @@
 }@media(max-width:740px) {
   .home-intro { grid-template-columns:minmax(0,1fr); }
   .hero-actions { margin-top:4px; }
-  .overview-insights article+article { border-inline-start:0; border-top:1px solid var(--line); }
+
 }
+.rotation-controls { display:flex; align-items:center; gap:12px; }
+.rotation-controls button { color:var(--ink); background:transparent; text-decoration:underline; text-underline-offset:3px; padding:6px; }

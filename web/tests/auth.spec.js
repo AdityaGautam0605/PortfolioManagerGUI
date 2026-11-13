@@ -176,3 +176,19 @@ test('another tab changing accounts clears the old workspace', async ({ page, co
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('sample stocks rotate and manual selection pauses the chart', async ({ page }) => {
+  await page.route('**/api/snapshot', route => route.fulfill({ status: 401, json: {} }));
+  await page.clock.install();
+  await page.goto('/');
+  const stock = symbol => page.getByRole('button', { name: symbol, exact: true });
+  await expect(stock('AAPL')).toHaveAttribute('aria-pressed', 'true');
+  await page.clock.fastForward(8000);
+  await expect(stock('TCS')).toHaveAttribute('aria-pressed', 'true');
+  await stock('SHOP').click();
+  await page.clock.fastForward(16000);
+  await expect(stock('SHOP')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Resume stock rotation' }).click();
+  await page.clock.fastForward(8000);
+  await expect(stock('AAPL')).toHaveAttribute('aria-pressed', 'true');
+});
