@@ -10,6 +10,7 @@ test('Firebase signup opens a verification link step and resumes username setup'
   await page.route('**/api/auth/firebase-check', route => route.fulfill({ json: { ticket: 'test', firebase: true, email } }));
   await page.route('**/api/auth/firebase-reset', route => route.fulfill({ json: { sent: true } }));
   await page.goto('/');
+  await page.getByRole('link', { name: 'Sign in', exact: true }).first().click();
   await page.getByRole('button', { name: 'Forgot password?' }).click();
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Send reset link' }).click();
@@ -29,7 +30,7 @@ test('unconfigured email leaves password login and Google signup available', asy
   await page.route('**/api/snapshot', route => route.fulfill({ status: 401, json: {} }));
   await page.route('**/api/auth/options', route => route.fulfill({ json: { emailEnabled: false, googleClientId: 'test' } }));
   await page.route('https://accounts.google.com/gsi/client', route => route.fulfill({ body: '' }));
-  await page.goto('/');
+  await page.goto('/#/signin');
   await expect(page.getByText('Email codes and password resets are currently unavailable.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Forgot password?' })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Sign in with an email code' })).toHaveCount(0);
@@ -58,6 +59,11 @@ test('hosted registration, account identity, logout, and failed login', async ({
   });
   await page.route('**/api/auth/login', route => route.fulfill({ status: 401, json: { error: 'Incorrect username or password.' } }));
   await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Your portfolio, in perspective.' })).toBeVisible();
+  await page.getByRole('link', { name: 'Create an account' }).click();
+  await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
+  await page.getByRole('link', { name: 'Folio home' }).click();
+  await page.getByRole('link', { name: 'Sign in', exact: true }).first().click();
   await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
   await page.screenshot({ path: 'test-results/hosted-signin-desktop.png', fullPage: true });
   await page.setViewportSize({ width: 320, height: 640 });
@@ -123,7 +129,7 @@ test('session expiry unmounts private portfolio data', async ({ page }) => {
   await expect(page.getByLabel('Account: alice', { exact: true })).toBeVisible();
   expired = true;
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true }).first()).toBeVisible();
   await expect(page.getByLabel('Account: alice', { exact: true })).toHaveCount(0);
 });
 

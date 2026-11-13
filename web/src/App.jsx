@@ -209,8 +209,18 @@ function TradeModal({ initial, pending, submit, close, demo, failureMessage }) {
 export default function App() {
   const [requiresSignIn, setRequiresSignIn] = useState(false);
   const [accountVersion, setAccountVersion] = useState(0);
+  const [hash, setHash] = useState(location.hash);
+  const hadSession = useRef(false);
   useEffect(() => {
-    const listener = () => setRequiresSignIn(true);
+    const onHash = () => setHash(location.hash);
+    const listener = () => {
+      if (hadSession.current || !['', '#/', '#/signin', '#/signup'].includes(location.hash)) {
+        location.hash = '/signin';
+      }
+      hadSession.current = false;
+      setHash(location.hash);
+      setRequiresSignIn(true);
+    };
     const accountChanged = (event) => {
       if (event.key === 'folio-account-change') {
         setAccountVersion(value => value + 1);
@@ -219,15 +229,45 @@ export default function App() {
     };
     window.addEventListener('folio-auth-required', listener);
     window.addEventListener('storage', accountChanged);
+    window.addEventListener('hashchange', onHash);
     return () => {
       window.removeEventListener('folio-auth-required', listener);
       window.removeEventListener('storage', accountChanged);
+      window.removeEventListener('hashchange', onHash);
     };
   }, []);
-  return requiresSignIn ? <SignIn onSignedIn={() => setRequiresSignIn(false)} /> : <CurrencyProvider><Workspace key={accountVersion} /></CurrencyProvider>;
+  if (requiresSignIn) {
+    if (hash === '#/signin' || hash === '#/signup')
+      return <SignIn key={hash} initialStep={hash === '#/signup' ? 'signup' : 'login'} onSignedIn={() => setRequiresSignIn(false)} />;
+    return <HomePage />;
+  }
+  return <CurrencyProvider><Workspace key={accountVersion} hadSession={hadSession} /></CurrencyProvider>;
 }
 
-function Workspace() {
+function HomePage() {
+  return <div className="home-page">
+    <header className="home-header">
+      <a href="#/" className="brand" aria-label="Folio home"><Brand />folio.</a>
+      <a className="button subtle" href="#/signin">Sign in</a>
+    </header>
+    <main className="home-hero">
+      <div className="home-intro">
+        <h1>Your portfolio,<br />in perspective.</h1>
+        <p>See what you own, follow stocks across markets, and explore how your portfolio could change over time.</p>
+        <div className="home-actions"><a href="#/signup" className="button primary">Create an account <ArrowRight size={16} /></a>
+          <a href="#/signin" className="text-button">Sign in</a></div>
+      </div>
+      <section className="panel home-preview" aria-label="Example portfolio allocation">
+        <div className="panel-topline"><h2>Portfolio allocation</h2><small>Example</small></div>
+        <div className="home-donut" role="img" aria-label="US 55%, India 30%, Canada 15%"><span>3 markets</span></div>
+        <ul>{[['US',55],['India',30],['Canada',15]].map(([market,weight],i)=>
+          <li key={market}><i style={{background:`var(--allocation-${i})`}} />{market}<strong>{weight}%</strong></li>)}</ul>
+      </section>
+    </main>
+  </div>;
+}
+
+function Workspace({ hadSession }) {
   const { money, signedMoney, rate, currency } = useCurrency();
   const accountMenu = useRef(null);
   useEffect(() => {
@@ -319,7 +359,11 @@ function Workspace() {
     const controller = new AbortController();
     request('/snapshot', { signal: controller.signal })
       .then((snapshot) => {
-        if (!controller.signal.aborted) setData(snapshot);
+        if (!controller.signal.aborted) {
+          hadSession.current = Boolean(snapshot.account);
+          if (['#/signin','#/signup'].includes(location.hash)) location.replace('#/');
+          setData(snapshot);
+        }
       })
       .catch((e) => {
         if (!controller.signal.aborted) setNotice({ type: 'error', message: e.message });
@@ -485,6 +529,7 @@ function Workspace() {
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
   }
 
+  if (loading && !data) return <main className="auth-shell" aria-label="Opening Folio"><span className="brand"><Brand />folio.</span></main>;
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -625,7 +670,7 @@ function Workspace() {
           <>
             {route === '/' && (
               <div className="overview-grid">
-                <section className="panel portfolio-panel">
+                <div className="overview-left"><section className="panel portfolio-panel">
                   <div className="panel-topline">
                     <span className="eyebrow">Portfolio value</span>
                     <span className="tiny-tag">
@@ -671,7 +716,65 @@ function Workspace() {
                       Record your first trade to start tracking your holdings.
                     </Empty>
                   )}
-                  <div className="allocation-section">
+                </section>
+                  <PortfolioOutlook key={JSON.stringify(positions)} total={total} demo={demo} />
+                </div>
+                <div className="overview-right">
+                  <section className="brief-panel">
+                    <div className="panel-topline">
+                      <span className="tiny-tag">
+                        <Sparkles size={13} /> Portfolio brief
+                      </span>
+                      <span className="muted">From your saved holdings</span>
+                    </div>
+                    <h2>
+                      {positions.length ? (
+                        <>
+                          {largest.symbol} <span className="soft">{positions.length === 1 ? 'is your only position.' : 'is your largest position.'}</span>
+                        </>
+                      ) : (
+                        <>
+                          Your first holding starts here.
+                        </>
+                      )}
+                    </h2>
+                    <p>
+                      {positions.length ? (
+                        <>
+                          At saved prices, your portfolio is {Math.abs(profit) < 0.005 ? 'at its cost basis' :
+                            <><strong className={tone(profit)}>{money(Math.abs(profit))}</strong> {profit > 0 ? 'above' : 'below'} its cost basis</>}.
+                        </>
+                      ) : (
+                        'Build your portfolio one position at a time. Record a trade to see your allocation and performance here.'
+                      )}
+                    </p>
+                    {largest && <div className="brief-allocation">
+                      <div><span>Portfolio weight · {largest.symbol}</span><strong>{weight(largest).toFixed(1)}%</strong></div>
+                      <div className="brief-meter"><i style={{ width: `${weight(largest)}%` }} /></div>
+                    </div>}
+                    <button className="text-button" onClick={() => go('/holdings')}>
+                      Explore your portfolio <ArrowRight size={15} />
+                    </button>
+                  </section>
+
+                  <section className="panel holdings-preview">
+                    <div className="section-heading">
+                      <h3>Your holdings</h3>
+                      <button className="text-button" onClick={() => go('/holdings')}>
+                        View all <ArrowUpRight size={14} />
+                      </button>
+                    </div>
+                    {positions.length ? (
+                      positions
+                        .slice(0, 5)
+                        .map((p) =>
+                          stockRow(stockBySymbol[p.symbol] || { ...p, name: p.symbol }, p),
+                        )
+                    ) : (
+                      <p className="muted">Your holdings will appear here.</p>
+                    )}
+                  </section>
+                  <section className="panel allocation-panel">
                     <div className="section-heading">
                       <h3>Where you're invested</h3>
                       <button className="text-button" onClick={() => go('/holdings')}>
@@ -713,62 +816,6 @@ function Workspace() {
                         </div>
                       </button>
                     ))}
-                  </div>
-                </section>
-                <div className="overview-right">
-                  <section className="brief-panel">
-                    <div className="panel-topline">
-                      <span className="tiny-tag">
-                        <Sparkles size={13} /> Portfolio brief
-                      </span>
-                      <span className="muted">From your saved holdings</span>
-                    </div>
-                    <h2>
-                      {positions.length ? (
-                        <>
-                          {largest.symbol} <span className="soft">{positions.length === 1 ? 'is your only position.' : 'is your largest position.'}</span>
-                        </>
-                      ) : (
-                        <>
-                          Your first holding starts here.
-                        </>
-                      )}
-                    </h2>
-                    <p>
-                      {positions.length ? (
-                        <>
-                          At saved prices, your portfolio is {Math.abs(profit) < 0.005 ? 'at its cost basis' :
-                            <><strong className={tone(profit)}>{money(Math.abs(profit))}</strong> {profit > 0 ? 'above' : 'below'} its cost basis</>}.
-                        </>
-                      ) : (
-                        'Build your portfolio one position at a time. Record a trade to see your allocation and performance here.'
-                      )}
-                    </p>
-                    {largest && <div className="brief-allocation">
-                      <div><span>Portfolio weight · {largest.symbol}</span><strong>{weight(largest).toFixed(1)}%</strong></div>
-                      <div className="brief-meter"><i style={{ width: `${weight(largest)}%` }} /></div>
-                    </div>}
-                    <button className="text-button" onClick={() => go('/holdings')}>
-                      Explore your portfolio <ArrowRight size={15} />
-                    </button>
-                  </section>
-                  <PortfolioOutlook key={JSON.stringify(positions)} total={total} demo={demo} />
-                  <section className="panel holdings-preview">
-                    <div className="section-heading">
-                      <h3>Your holdings</h3>
-                      <button className="text-button" onClick={() => go('/holdings')}>
-                        View all <ArrowUpRight size={14} />
-                      </button>
-                    </div>
-                    {positions.length ? (
-                      positions
-                        .slice(0, 5)
-                        .map((p) =>
-                          stockRow(stockBySymbol[p.symbol] || { ...p, name: p.symbol }, p),
-                        )
-                    ) : (
-                      <p className="muted">Your holdings will appear here.</p>
-                    )}
                   </section>
                   {positions.length > 1 && <section className="insight-grid">
                     <button

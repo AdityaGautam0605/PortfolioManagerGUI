@@ -11,6 +11,14 @@ test('display currency converts totals and projections and persists across reloa
   await expect(page.locator('.portfolio-value')).toContainText('16,000.00');
   await page.getByLabel('Time horizon').selectOption('1');
   await expect(page.locator('.outlook > strong')).toContainText('16,800.00');
+  for (const width of [1440,820,390]) {
+    await page.setViewportSize({width,height:900});
+    const value = await page.locator('.portfolio-panel').boundingBox();
+    const holdings = await page.locator('.holdings-preview:not(.outlook)').boundingBox();
+    if (width>740) expect(holdings.x).toBeGreaterThanOrEqual(value.x+value.width);
+    else expect(holdings.y).toBeGreaterThanOrEqual(value.y+value.height);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
   await page.getByRole('button',{name:'Analyze my portfolio'}).click();
   await expect(page.getByText('Review the largest position.')).toBeVisible();
   await page.reload();

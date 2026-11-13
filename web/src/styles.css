@@ -2014,3 +2014,35 @@ kbd {
   .auth-shell { padding: 12px; }
   .auth-names { grid-template-columns: 1fr; }
 }
+
+.overview-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.overview-left, .overview-right { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.allocation-panel { padding: clamp(18px, 2.4vw, 30px); }
+.home-page { max-width: 1200px; margin: auto; padding: 0 clamp(20px, 5vw, 64px); }
+.home-header, .home-actions { display: flex; align-items: center; gap: 24px; }
+.home-header { justify-content: space-between; padding: 24px 0; border-bottom: 1px solid var(--border); }
+.home-hero { display: grid; grid-template-columns: 1.15fr 1fr; gap: clamp(28px, 6vw, 88px); align-items: center; padding: clamp(40px, 10vh, 110px) 0; }
+.home-intro h1 { font-size: clamp(44px, 6vw, 84px); letter-spacing: -.06em; line-height: 1.04; }
+.home-intro p { max-width: 43ch; margin: 20px 0 28px; line-height: 1.65; color: var(--muted); }
+.home-preview { padding: clamp(20px, 3vw, 38px); }
+.home-preview h2 { font-size: 18px; }
+.home-preview small { color: var(--muted); }
+.home-donut { display: grid; place-items: center; width: min(190px, 75%); aspect-ratio: 1; margin: 30px auto; border-radius: 50%; background: conic-gradient(var(--allocation-0) 0 55%, var(--allocation-1) 55% 85%, var(--allocation-2) 85%); }
+.home-donut span { display: grid; place-items: center; width: 72%; height: 72%; border-radius: 50%; background: var(--panel); }
+.home-preview ul { list-style: none; margin: 0; padding: 0; }
+.home-preview li { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); padding: 10px 0; }
+.home-preview li strong { margin-left: auto; }
+.home-preview li i { width: 8px; height: 8px; border-radius: 50%; }
+@media (max-width: 740px) {
+  .overview-grid, .home-hero { grid-template-columns: minmax(0, 1fr); }
+  .overview-grid { gap: 14px; }
+  .overview-left, .overview-right { display: contents; }
+  .overview-grid > div > * { min-width: 0; grid-column: 1; }
+  .overview-grid .portfolio-panel { order: 0; }
+  .overview-grid .holdings-preview { order: 1; }
+  .overview-grid .allocation-panel { order: 2; }
+  .overview-grid .brief-panel { order: 3; }
+  .overview-grid .outlook { order: 4; }
+  .overview-grid .insight-grid, .overview-grid .quiet-note { order: 5; }
+  body:has(.home-page), body:has(.overview-grid) { min-width: 0; }
+}

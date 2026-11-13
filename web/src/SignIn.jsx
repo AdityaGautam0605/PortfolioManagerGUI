@@ -9,8 +9,8 @@ const titles = {
 const blankProfile = { email: '', firstName: '', middleName: '', lastName: '', password: '', username: '', code: '' };
 const post = (path, body) => request('/auth/' + path, { method: 'POST', body });
 
-export default function SignIn({ onSignedIn }) {
-  const [step, setStep] = useState('login');
+export default function SignIn({ onSignedIn, initialStep = 'login' }) {
+  const [step, setStep] = useState(initialStep);
   const [purpose, setPurpose] = useState('');
   const [fields, setFields] = useState(blankProfile);
   const [ticket, setTicket] = useState('');
@@ -134,7 +134,7 @@ export default function SignIn({ onSignedIn }) {
   const action = { signup: 'Verify email', login: 'Sign in', email: 'Send sign-in code', reset: firebaseEnabled ? 'Send reset link' : 'Send reset code', link: 'I verified my email',
     verify: purpose === 'reset' ? 'Set new password' : 'Continue', username: 'Create account' }[step];
   return <main className="auth-shell"><section className="panel auth-panel" aria-labelledby="auth-heading">
-    <span className="auth-brand">folio.</span>
+    <a className="auth-brand" href="#/" aria-label="Folio home">folio.</a>
     <h1 ref={heading} tabIndex={-1} id="auth-heading">{titles[step]}</h1>
     {step === 'verify' && <p>Enter the code sent to <strong>{fields.email}</strong>. It expires in 10 minutes.</p>}
     {step === 'link' && <p>Open the verification link sent to <strong>{fields.email}</strong>, then return here to continue.</p>}
