@@ -24,11 +24,39 @@ public final class StockSummary {
         if (prices.getMin() <= 0 || !Double.isFinite(prices.getMax()) || !Double.isFinite(prices.getMin()))
             throw new OperationException("Price history contains an invalid close.");
         double change = 100 * (last.getPrice()/first.getPrice()-1);
+        String currency = StockAPI.quoteCurrency(symbol);
         String facts = String.format(Locale.US,
-                "%s closed at $%.2f on %s and $%.2f on %s, a %+.2f%% change. Across these %d sessions, closing prices ranged from $%.2f to $%.2f.",
-                symbol,first.getPrice(),first.getDate(),last.getPrice(),last.getDate(),change,count,prices.getMin(),prices.getMax());
+                "%s closed at %.2f %s on %s and %.2f %s on %s, a %+.2f%% change. Across these %d sessions, closing prices ranged from %.2f to %.2f %s.",
+                symbol,first.getPrice(),currency,first.getDate(),last.getPrice(),currency,last.getDate(),change,count,prices.getMin(),prices.getMax(),currency);
         var result = new JSONObject().put("text",facts).put("ai",false).put("stale",history.stale())
                 .put("from",first.getDate()).put("through",last.getDate()).put("sessions",count);
+        return generate(facts,result,demo);
+    }
+
+    public JSONObject portfolio(List<PortfolioItem> positions, boolean demo) {
+        double value = 0, largest = 0, cost = 0;
+        String symbol = "";
+        for (var p : positions) {
+            double amount = p.getQuantity()*p.getCurrentPrice();
+            value += amount;
+            cost += p.getQuantity()*p.getAvgBuyPrice();
+            if (amount > largest) { symbol=p.getSymbol(); largest=amount; }
+        }
+        if (value<=0 || cost<=0) throw new OperationException("Add a priced holding to analyze your portfolio.");
+        double weight = 100*largest/value;
+        String facts = String.format(Locale.US,"%d holdings. %s represents %.1f%% of saved market value. Unrealized return against cost is %+.2f%%.",
+                positions.size(),symbol,weight,100*(value/cost-1));
+        boolean concentrated = weight>=30;
+        String next = concentrated ? "Review your largest position against your target allocation before adding to it."
+                : "Compare the portfolio with your target allocation before your next contribution.";
+        var result = new JSONObject().put("text",facts).put("ai",false).put("next",next)
+                .put("confidence",concentrated ? "High" : "Moderate")
+                .put("reason",concentrated ? "The largest holding meets the 30% concentration screen at saved prices."
+                        : "Weights are known, but allocation targets and exposure overlap are unknown.");
+        return generate(facts+" Suggested next step: "+next,result,demo);
+    }
+
+    private JSONObject generate(String facts, JSONObject result, boolean demo) {
         String apiKey = System.getenv("GEMINI_API_KEY");
         if (demo || apiKey == null || apiKey.isBlank()) return result;
         synchronized (summaries) {

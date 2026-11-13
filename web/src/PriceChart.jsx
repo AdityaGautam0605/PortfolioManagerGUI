@@ -1,9 +1,16 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { ArrowUpRight, RefreshCw } from 'lucide-react';
-import { money, percent, tone } from './api.js';
+import { percent, tone } from './api.js';
+import { useCurrency } from './Currency.jsx';
+import { quoteCurrency } from './stockLibrary.js';
 import { cachedHistory, freshHistory, loadHistory } from './history.js';
 
 export default function PriceChart({ symbol, demo = false }) {
+  const { currency, fx, money } = useCurrency();
+  const native = quoteCurrency(symbol);
+  const chartCurrency = native === 'USD' || fx ? currency : native;
+  const formatClose = value => native === 'USD' ? money(value) : fx ? money(value/fx.rates[native]) :
+    new Intl.NumberFormat('en-US',{style:'currency',currency:native,currencyDisplay:'code'}).format(value);
   const [result, setResult] = useState(
     () => cachedHistory(symbol, demo) || { symbol: '', points: [] },
   );
@@ -80,8 +87,8 @@ export default function PriceChart({ symbol, demo = false }) {
           {change !== null && <span className={`chart-period-change ${tone(change)}`}>{percent(change)} · {points.length} sessions</span>}
         </div>
         <div className="chart-quote">
-          {active ? money(active.price) : last ? money(last.price) : '—'}
-          <span>{active ? active.date : last ? `Close · ${last.date}` : 'Closing price'}</span>
+          {active ? formatClose(active.price) : last ? formatClose(last.price) : '—'}
+          <span>{active ? active.date : last ? `Close · ${last.date}` : 'Closing price'} · {chartCurrency}{chartCurrency!==native && fx ? ' at FX '+fx.date : ''}</span>
         </div>
       </div>
       <div className="chart-canvas">

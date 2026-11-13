@@ -30,6 +30,7 @@ public class StockAPI {
 
     StockData fetchStockData(String symbol) {
         double price = fetchLivePrice(symbol);
+        if (!"USD".equals(quoteCurrency(symbol))) return new StockData(symbol,price);
         String name = symbol;
         try {
             JSONObject profile = request("https://www.alphavantage.co/query?function=OVERVIEW&symbol="
@@ -43,6 +44,10 @@ public class StockAPI {
     }
 
     double fetchLivePrice(String symbol) {
+        if (symbol.startsWith("TSX:") || symbol.startsWith("BSE:")) {
+            var closes = fetchHistoricalData(symbol);
+            return closes.getLast().getPrice() / ExchangeRates.latest().getJSONObject("rates").getDouble(quoteCurrency(symbol));
+        }
         JSONObject json = request("https://finnhub.io/api/v1/quote?symbol=" + encode(symbol)
                 + "&token=" + encode(Config.get("finnhub.api.key")));
         double price = json.optDouble("c", Double.NaN);
@@ -68,9 +73,20 @@ public class StockAPI {
         }
     }
 
+    public static String quoteCurrency(String symbol) {
+        if (symbol.startsWith("TSX:")) return "CAD";
+        if (symbol.startsWith("BSE:")) return "INR";
+        return "USD";
+    }
+    private static String alphaSymbol(String symbol) {
+        if (symbol.startsWith("TSX:")) return symbol.substring(4) + ".TRT";
+        if (symbol.startsWith("BSE:")) return symbol.substring(4) + ".BSE";
+        return symbol;
+    }
+
     private ObservableList<HistoricalDataPoint> alphaHistory(String symbol) {
         JSONObject json = request("https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol="
-                + encode(symbol) + "&apikey=" + encode(Config.get("alphavantage.api.key")));
+                + encode(alphaSymbol(symbol)) + "&apikey=" + encode(Config.get("alphavantage.api.key")));
         JSONObject series = json.optJSONObject("Time Series (Daily)");
         if (series == null || series.isEmpty())
             throw new OperationException("Historical data is unavailable for " + symbol + ". Check the symbol or retry later.");
@@ -89,8 +105,10 @@ public class StockAPI {
     }
 
     private ObservableList<HistoricalDataPoint> backupHistory(String symbol) {
+        String ticker = alphaSymbol(symbol).equals(symbol) ? symbol : symbol.substring(4);
+        String exchange = symbol.startsWith("TSX:") ? "TSX" : symbol.startsWith("BSE:") ? "BSE" : "";
         JSONObject json = request("https://api.twelvedata.com/time_series?interval=1day&outputsize=100&symbol="
-                + encode(symbol) + "&apikey=" + encode(backupKey));
+                + encode(ticker) + (exchange.isEmpty() ? "" : "&exchange="+exchange) + "&apikey=" + encode(backupKey));
         if ("error".equals(json.optString("status"))) {
             throw new OperationException(switch (json.optInt("code")) {
                 case 429 -> "Twelve Data's quota was reached.";
@@ -100,7 +118,8 @@ public class StockAPI {
         }
         try {
             JSONObject meta = json.getJSONObject("meta");
-            if (!symbol.equalsIgnoreCase(meta.getString("symbol")) || !"1day".equals(meta.getString("interval")))
+            if (!ticker.equalsIgnoreCase(meta.getString("symbol")) || !"1day".equals(meta.getString("interval"))
+                    || !exchange.isEmpty() && (!exchange.equalsIgnoreCase(meta.optString("exchange")) || !quoteCurrency(symbol).equals(meta.optString("currency"))))
                 throw new IllegalArgumentException();
             LocalDate today = LocalDate.now(ZoneId.of(meta.getString("exchange_timezone")));
             JSONArray values = json.getJSONArray("values");

@@ -58,6 +58,8 @@ public final class HostedChecks {
         HostedSchema.main(new String[0]);
         var auth = new HostedAuth();
         var summary = new StockSummary();
+        var outlook = summary.portfolio(List.of(new PortfolioItem("AAPL",3,100,110,30)),true);
+        check(outlook.getString("confidence").equals("High") && outlook.getString("text").contains("100.0%") && !outlook.getBoolean("ai"),"Allocation review and confidence use actual holdings");
         var daily = List.of(new HistoricalDataPoint("2026-01-05",100), new HistoricalDataPoint("2026-01-06",95));
         var measured = summary.describe("ABC",new HistoryCache.Result(daily,0,true,false,null),true);
         check(!measured.getBoolean("ai") && measured.getBoolean("stale") && measured.getString("text").contains("-5.00%"),"Measured summary reports date, freshness and loss");

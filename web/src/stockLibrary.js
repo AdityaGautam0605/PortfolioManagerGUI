@@ -15,7 +15,17 @@ const companies = [
   ['XOM', 'Exxon Mobil', 'Energy'], ['CVX', 'Chevron', 'Energy'],
   ['CAT', 'Caterpillar', 'Industrials'], ['UPS', 'United Parcel Service', 'Industrials'],
   ['NEE', 'NextEra Energy', 'Utilities'], ['PLD', 'Prologis', 'Real estate'],
+  ['TSX:SHOP', 'Shopify', 'Technology'], ['TSX:RY', 'Royal Bank of Canada', 'Financials'],
+  ['TSX:CNQ', 'Canadian Natural Resources', 'Energy'], ['BSE:RELIANCE', 'Reliance Industries', 'Energy'],
+  ['BSE:TCS', 'Tata Consultancy Services', 'Technology'], ['BSE:HDFCBANK', 'HDFC Bank', 'Financials'],
 ];
+
+export function marketOf(symbol) {
+  return symbol.startsWith('TSX:') ? 'Toronto' : symbol.startsWith('BSE:') ? 'Bombay' : 'US';
+}
+export function quoteCurrency(symbol = '') {
+  return symbol.startsWith('TSX:') ? 'CAD' : symbol.startsWith('BSE:') ? 'INR' : 'USD';
+}
 
 export function stockLibrary(saved, watched, demo) {
   const library = new Map();

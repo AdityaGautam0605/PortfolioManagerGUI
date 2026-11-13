@@ -1095,6 +1095,12 @@ tbody tr:hover {
   padding: 24px;
 }
 .stock-card-sector { font-size: 14px; color: var(--muted); }
+.currency-picker small, .outlook small { display: block; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+.outlook p { margin: 10px 0; line-height: 1.6; }
+.outlook h4 { margin: 20px 0 8px; }
+.outlook label { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0; }
+.outlook input[type=range] { max-width: 100%; accent-color: var(--text); }
+.outlook > strong { font-size: 1.6rem; }
 .performance-summary { border-top: 1px solid var(--border-strong); margin-top: 16px; padding-top: 12px; }
 .performance-summary p { font-size: 14px; line-height: 1.6; margin: 8px 0; }
 .performance-summary small { color: var(--muted); display: block; margin-top: 10px; }

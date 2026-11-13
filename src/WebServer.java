@@ -151,6 +151,10 @@ public class WebServer {
                         .put("positions", positions).put("stocks", stocks).put("loadedAt", Instant.now().toString());
                 if (account != null) snapshot.put("account", new JSONObject().put("id", account.id()).put("username", account.username())).put("session",sessionInfo);
                 send(exchange, 200, snapshot);
+            } else if (method.equals("GET") && route.equals("/api/exchange-rates")) {
+                send(exchange,200,ExchangeRates.latest());
+            } else if (method.equals("POST") && route.equals("/api/portfolio-analysis")) {
+                send(exchange,200,stockSummary.portfolio(manager.getPortfolioOverview(),demo));
             } else if ((method.equals("GET") && route.equals("/api/history")) ||
                     (method.equals("POST") && route.equals("/api/summary"))) {
                 String symbol = symbol(query(exchange, "symbol"));

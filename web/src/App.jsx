@@ -31,9 +31,11 @@ import {
   Wallet,
   X,
 } from 'lucide-react';
-import { announceAccountChange, go, money, percent, readStored, request, signedMoney, store, tone } from './api.js';
+import { announceAccountChange, go, percent, readStored, request, store, tone } from './api.js';
 import PriceChart from './PriceChart.jsx';
-import { stockLibrary } from './stockLibrary.js';
+import { stockLibrary, marketOf } from './stockLibrary.js';
+import { CurrencyProvider, CurrencyPicker, useCurrency } from './Currency.jsx';
+import PortfolioOutlook from './PortfolioOutlook.jsx';
 import PerformanceSummary from './PerformanceSummary.jsx';
 import SignIn from './SignIn.jsx';
 import { trackSession } from './session.js';
@@ -165,8 +167,8 @@ function TradeModal({ initial, pending, submit, close, demo, failureMessage }) {
             disabled={pending}
             maxLength={20}
             required
-            pattern="[a-zA-Z0-9][a-zA-Z0-9.:-]*"
-            placeholder="e.g. AAPL"
+            pattern="[a-zA-Z0-9][a-zA-Z0-9.:\-]*"
+            placeholder="AAPL, TSX:SHOP or BSE:TCS"
             onChange={(e) => setSymbol(e.target.value)}
           />
         </label>
@@ -222,10 +224,11 @@ export default function App() {
       window.removeEventListener('storage', accountChanged);
     };
   }, []);
-  return requiresSignIn ? <SignIn onSignedIn={() => setRequiresSignIn(false)} /> : <Workspace key={accountVersion} />;
+  return requiresSignIn ? <SignIn onSignedIn={() => setRequiresSignIn(false)} /> : <CurrencyProvider><Workspace key={accountVersion} /></CurrencyProvider>;
 }
 
 function Workspace() {
+  const { money, signedMoney, rate, currency } = useCurrency();
   const accountMenu = useRef(null);
   useEffect(() => {
     const closeOutside = (e) => {
@@ -256,6 +259,7 @@ function Workspace() {
   });
   const [query, setQuery] = useState('');
   const [libraryFilter, setLibraryFilter] = useState('all');
+  const [market,setMarket] = useState('All markets');
   const [sort, setSort] = useState('value');
   const [chartSymbol, setChartSymbol] = useState('');
   const demo = data?.mode === 'demo';
@@ -420,6 +424,7 @@ function Workspace() {
   const filteredStocks = stocks.filter((s) => {
     const held = positions.some((p) => p.symbol === s.symbol);
     return `${s.symbol} ${s.name} ${s.sector || ''}`.toLowerCase().includes(query.trim().toLowerCase())
+      && (route !== '/library' || market === 'All markets' || marketOf(s.symbol) === market)
       && (route !== '/library' || libraryFilter === 'all' || (libraryFilter === 'held' ? held : !held));
   });
   const nav = [
@@ -454,14 +459,15 @@ function Workspace() {
   }
   function exportHoldings() {
     const rows = [
-      ['Symbol', 'Shares', 'Average cost', 'Saved price', 'Market value', 'Unrealized P/L'],
+      ['Symbol', 'Shares', 'Average cost', 'Saved price', 'Market value', 'Unrealized P/L', 'Currency'],
       ...positions.map((p) => [
         p.symbol,
         p.quantity,
-        p.averageCost,
-        p.price,
-        p.quantity * p.price,
-        p.profitLoss,
+        p.averageCost*rate,
+        p.price*rate,
+        p.quantity * p.price*rate,
+        p.profitLoss*rate,
+        currency,
       ]),
     ];
     const blob = new Blob(
@@ -643,9 +649,7 @@ function Workspace() {
                     </div>
                     <div>
                       <span>Currency</span>
-                      <strong>
-                        USD <span className="currency-dot" />
-                      </strong>
+                      <CurrencyPicker />
                     </div>
                   </div>
                   <div className="chart-selector">
@@ -748,6 +752,7 @@ function Workspace() {
                       Explore your portfolio <ArrowRight size={15} />
                     </button>
                   </section>
+                  <PortfolioOutlook key={JSON.stringify(positions)} total={total} demo={demo} />
                   <section className="panel holdings-preview">
                     <div className="section-heading">
                       <h3>Your holdings</h3>
@@ -955,6 +960,9 @@ function Workspace() {
                   {route === '/library' && <select aria-label="Filter by ownership" value={libraryFilter} onChange={e => setLibraryFilter(e.target.value)}>
                     <option value="all">All stocks</option><option value="unheld">Outside my portfolio</option><option value="held">My holdings</option>
                   </select>}
+                  {route === '/library' && !demo && <select aria-label="Stock market" value={market} onChange={e=>setMarket(e.target.value)}>
+                    {['All markets','US','Toronto','Bombay'].map(m=><option key={m}>{m}</option>)}
+                  </select>}
                   <span className="muted">
                     {route === '/watchlist'
                       ? `${watched.length} saved to this browser`
@@ -1116,7 +1124,7 @@ function Workspace() {
                   </p>
                   <div className="settings-fact">
                     <span>Currency</span>
-                    <strong>US Dollar (USD)</strong>
+                    <CurrencyPicker />
                   </div>
                   <div className="settings-fact">
                     <span>Watchlist storage</span>
@@ -1259,6 +1267,7 @@ function StockDetail({
   remove,
   disabled,
 }) {
+  const { money, signedMoney } = useCurrency();
   return (
     <>
       <button className="text-button back-link" onClick={() => go('/library')}>
