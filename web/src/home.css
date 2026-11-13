@@ -159,17 +159,17 @@
   .listing-details { animation:listing-open 450ms ease-out both; }
   @keyframes listing-open { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
   @supports (mask-image:linear-gradient(90deg,black,transparent)) {
-    .product-overview .gradient-heading { --reveal-start:2.3s; }
+    .product-overview .gradient-heading { --reveal-start:1.4s; }
     .gradient-heading > span {
       mask-image:linear-gradient(100deg,#000 35%,transparent 65%);
       mask-size:320% 100%;
       animation:headline-sweep 8s linear var(--reveal-start, 0s) infinite backwards;
     }
-    .gradient-heading > span + span { animation-delay:calc(var(--reveal-start, 0s) + .6s); }
+    .gradient-heading > span + span { animation-delay:calc(var(--reveal-start, 0s) + .28s); }
   }
   @keyframes headline-sweep {
     0% { mask-position:100% 0; opacity:0; }
-    18%,92% { mask-position:0% 0; opacity:1; }
+    14%,92% { mask-position:0% 0; opacity:1; }
     100% { mask-position:0% 0; opacity:0; }
   }  .sample-line { stroke-dasharray:1; animation:draw-close 1.45s ease-out both; }
   @keyframes draw-close { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
