@@ -113,10 +113,13 @@
 .home-intro h1 { grid-column:1/-1; font-size:clamp(50px,7vw,116px); max-width:19ch; line-height:.97; font-weight:500; }
 .home-intro h1 em { display:inline-block; font:inherit; color:var(--dim); }
 .home-intro p { margin:0; max-width:62ch; }
-.market-stage { isolation:isolate; position:relative; overflow:hidden; margin-top:clamp(22px,3vw,44px); padding:clamp(18px,3vw,46px); background:#29223b; }
-.market-stage::before { content:""; position:absolute; inset:-24%; z-index:-1; background:radial-gradient(ellipse at 75% 22%,#9794cc 0%,transparent 38%),radial-gradient(ellipse at 30% 90%,#65439a 4%,transparent 46%),linear-gradient(155deg,#14141e 15%,#414464 49%,#37294e 73%); }
-.market-preview { width:min(100%,1080px); margin-inline:auto; border-radius:10px; }
-.preview-body svg { height:clamp(100px,12vw,175px); }
+.market-stage { margin-top:clamp(22px,3vw,44px); padding:clamp(12px,3vw,42px); border:1px solid var(--line); background:var(--page); background-image:radial-gradient(var(--line) .8px,transparent .8px); background-size:12px 12px; }
+.market-preview { width:min(100%,1200px); margin-inline:auto; border-radius:10px; }
+.preview-layout { display:grid; grid-template-columns:minmax(170px,1fr) minmax(0,3fr); }
+.preview-layout .preview-switch { display:grid; align-content:center; gap:10px; padding:16px; border-right:1px solid var(--line); }
+.preview-switch button { display:grid; text-align:left; border:1px solid var(--line); gap:3px; padding:10px; }
+.preview-switch button span,.preview-switch button small { font-size:12px; font-weight:400; }
+.preview-switch button small { color:inherit; }.preview-body svg { height:clamp(100px,12vw,175px); }
 .session-slider,.insight-control input { width:100%; accent-color:var(--ink); cursor:pointer; }
 .session-slider { display:block; margin:6px 0; }
 .overview-insights { gap:0; border-block:1px solid var(--line); }
@@ -130,16 +133,18 @@
 .insight-control div { border-top:1px solid var(--line); margin-top:5px; }
 .home-page button,.home-page a { transition:background-color .18s,color .18s; }
 @media (prefers-reduced-motion:no-preference) {
-  .market-stage::before { animation:market-light 5s ease-out both; }
-  .sample-line { stroke-dasharray:1; animation:draw-close .65s ease-out both; }
-  @keyframes market-light { from { transform:translate(-8%,5%) scale(1.08); } to { transform:none; } }
+  .home-intro h1 span,.home-intro h1 em { display:inline-block; animation:headline-reveal .95s cubic-bezier(.18,.72,.24,1) backwards; }
+  .home-intro h1 em { animation-delay:.23s; }
+  .sample-line { stroke-dasharray:1; animation:draw-close .85s ease-out both; }
+  @keyframes headline-reveal { from { clip-path:inset(0 100% -12% 0); transform:translateY(.12em); opacity:.25; } to { clip-path:inset(0 0 -12% 0); transform:none; opacity:1; } }
   @keyframes draw-close { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
-  @supports (animation-timeline:view()) {
-    .product-overview,.home-hero ~ .discovery,.trade-example { animation:tour-enter ease-out both; animation-timeline:view(); animation-range:entry 0% entry 75%; }
-    @keyframes tour-enter { from { transform:translateY(18px); } to { transform:none; } }
-  }
 }
 @media(max-width:740px) {
+  .preview-layout { grid-template-columns:minmax(0,1fr); }
+  .preview-layout .preview-switch { grid-template-columns:repeat(3,minmax(0,1fr)); padding:10px; gap:4px; border:0; }
+  .preview-switch button { padding:6px; min-width:0; }
+  .preview-switch button span { display:none; }
+}@media(max-width:740px) {
   .home-intro { grid-template-columns:minmax(0,1fr); }
   .hero-actions { margin-top:4px; }
   .overview-insights article+article { border-inline-start:0; border-top:1px solid var(--line); }

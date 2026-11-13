@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Sun, Moon, Search } from 'lucide-react';
 import { marketOf, quoteCurrency, stockLibrary } from './stockLibrary';
 import './home.css';
@@ -20,10 +20,12 @@ function MarketPreview() {
   const line = prices.map((p,i) => `${i ? 'L' : 'M'}${4+i*472/(prices.length-1)},${123-(p-min)*108/(max-min)}`).join(' ');
   return <section className="market-preview" aria-label="Interactive sample stock chart">
     <header><span><span className="preview-dot" />Stock explorer</span><small>Sample data</small></header>
-    <div className="preview-body">
-      <div className="preview-switch" aria-label="Choose an example stock">{samples.map((s,i)=>
-        <button key={s.symbol} aria-pressed={i===selected} onClick={()=>{select(i); setSession(s.prices.length-1);}}>{s.symbol}</button>)}</div>
-      <div className="preview-quote" aria-live="polite"><div><small>{market} · {name}</small>
+    <div className="preview-layout">
+      <div className="preview-switch" aria-label="Choose an example stock">{samples.map((stock,i)=>
+        <button key={stock.symbol} data-motion-part aria-label={stock.symbol} aria-pressed={i===selected} onClick={()=>{select(i); setSession(stock.prices.length-1);}}>
+          <strong>{stock.symbol}</strong><span>{stock.name}</span><small>{stock.currency} {stock.prices.at(-1).toFixed(2)}</small>
+        </button>)}</div>
+      <div className="preview-body" data-motion-part>      <div className="preview-quote" aria-live="polite"><div><small>{market} · {name}</small>
         <strong>{new Intl.NumberFormat('en-US',{minimumFractionDigits:2}).format(price)} <em>{currency}</em></strong></div>
         <span className={change<0?'down':''}>{change>0?'+':''}{change.toFixed(2)}%</span></div>
       <svg className={prices.at(-1)<prices[0]?'down':''} preserveAspectRatio="none" viewBox="0 0 480 140" role="img" aria-label={`${symbol} sample closing prices over 22 sessions`}>
@@ -34,7 +36,7 @@ function MarketPreview() {
         <circle cx={4+session*472/(prices.length-1)} cy={123-(price-min)*108/(max-min)} r="4" fill="currentColor"/>
       </svg>
       <input className="session-slider" type="range" min="0" max={prices.length-1} value={session} aria-label="Inspect sample trading session" aria-valuetext={`Session ${session+1}, ${price} ${currency}`} onChange={e=>setSession(Number(e.target.value))}/>
-      <div className="preview-caption"><span>Daily closing price</span><span>Session {session+1} of {prices.length}</span></div>
+      <div className="preview-caption"><span>Daily closing price</span><span>Session {session+1} of {prices.length}</span></div></div>
     </div>
   </section>;
 }
@@ -62,7 +64,7 @@ function Discover({ full = false }) {
       <label className="company-search"><Search size={17}/><input type="search" aria-label="Search companies" placeholder="Company, ticker or sector" value={query} onChange={e=>{setQuery(e.target.value);setExpanded(false);}}/></label></div>
     <div className="directory-toolbar"><div className="market-filters">{markets.map(item=><button key={item} aria-pressed={item===market} onClick={()=>{setMarket(item);setExpanded(false);}}>{item}</button>)}</div>
       <small aria-live="polite">{matches.length} {matches.length===1?'company':'companies'}</small></div>
-    <ul className="company-grid">{(full || expanded?matches:matches.slice(0,6)).map(({name,symbol,sector})=><li key={symbol}>
+    <ul className="company-grid" data-motion-group={full ? undefined : true}>{(full || expanded?matches:matches.slice(0,6)).map(({name,symbol,sector})=><li key={symbol} data-motion-part>
       <button className="company-row" aria-expanded={selected===symbol} onClick={()=>setSelected(selected===symbol?'':symbol)}>
         <span><strong>{name}</strong><small>{symbol} · {marketOf(symbol)}</small></span><span>{sector} {selected===symbol?'−':'+'}</span>
       </button>
@@ -97,15 +99,15 @@ function ProductOverview() {
   const [years,setYears] = useState(5);
   return <section className="product-overview" aria-labelledby="overview-title">
     <h2 id="overview-title">What can Folio tell you?</h2>
-    <div className="overview-insights">
-      <article><h3>Which holdings drive my returns?</h3><p>A position’s size matters as much as its return. In this example, the stock with the smaller percentage gain contributes more money.</p>
+    <div className="overview-insights" data-motion-group>
+      <article data-motion-part><h3>Which holdings drive my returns?</h3><p>A position’s size matters as much as its return. In this example, the stock with the smaller percentage gain contributes more money.</p>
         <dl className="return-example"><div><dt>$1,000 × 5%</dt><dd>+$50</dd></div><div><dt>$200 × 10%</dt><dd>+$20</dd></div></dl>
       </article>
-      <article><h3>How much depends on one stock?</h3><p>Suppose one stock falls 10% while everything else stays flat. Adjust its share of the portfolio to see the impact.</p>
+      <article data-motion-part><h3>How much depends on one stock?</h3><p>Suppose one stock falls 10% while everything else stays flat. Adjust its share of the portfolio to see the impact.</p>
         <div className="insight-control"><label htmlFor="sample-weight">Position weight <b>{weight}%</b></label><input id="sample-weight" type="range" min="1" max="100" value={weight} onChange={e=>setWeight(Number(e.target.value))}/>
         <div>Portfolio change <output htmlFor="sample-weight">−{(weight/10).toFixed(1)}%</output></div></div>
       </article>
-      <article><h3>What if my returns change?</h3><p>Explore how $1,000 would grow at an assumed 5% annual return, with gains reinvested and no additional deposits.</p>
+      <article data-motion-part><h3>What if my returns change?</h3><p>Explore how $1,000 would grow at an assumed 5% annual return, with gains reinvested and no additional deposits.</p>
         <div className="insight-control"><label htmlFor="sample-years">Time horizon <b>{years} {years===1?'year':'years'}</b></label><input id="sample-years" type="range" min="1" max="10" value={years} onChange={e=>setYears(Number(e.target.value))}/>
         <div>Projected value <output htmlFor="sample-years">{(1000*1.05**years).toLocaleString('en-US',{style:'currency',currency:'USD'})}</output></div></div>
       </article>
@@ -113,6 +115,47 @@ function ProductOverview() {
   </section>;
 }
 export default function HomePage({ mark, theme, setTheme, libraryPage }) {
+  const tour = useRef(null);
+  useEffect(() => {
+    if (libraryPage || !tour.current || !window.IntersectionObserver || !Element.prototype.animate) return;
+    const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const animations = new Set();
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        observer.unobserve(entry.target);
+        if (preference.matches) continue;
+        const parts = entry.target.querySelectorAll('[data-motion-part]');
+        parts.forEach((part, index) => {
+          const animation = part.animate([
+            { opacity: 0, transform: 'translateY(20px)' },
+            { opacity: 1, transform: 'translateY(0)' }
+          ], { duration: 580, delay: index * 95, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'backwards' });
+          animations.add(animation);
+          animation.onfinish = () => animations.delete(animation);
+        });
+        const line = entry.target.querySelector('.sample-line');
+        if (line) {
+          const trace = line.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], {
+            duration: 850, delay: 360, easing: 'ease-out', fill: 'backwards'
+          });
+          animations.add(trace);
+          trace.onfinish = () => animations.delete(trace);
+        }
+      }
+    }, { threshold: 0.08 });
+    tour.current.querySelectorAll('[data-motion-group]').forEach(group => observer.observe(group));
+    function stopMotion() {
+      for (const animation of animations) animation.cancel();
+      animations.clear();
+    }
+    preference.addEventListener('change', stopMotion);
+    return () => {
+      observer.disconnect();
+      preference.removeEventListener('change', stopMotion);
+      stopMotion();
+    };
+  }, [libraryPage]);
   const jump = id => document.getElementById(id)?.focus();
   const dark = theme === 'dark';
   return <div className="home-page"><div className="home-wrap">
@@ -120,10 +163,10 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
       <nav aria-label="Product navigation"><a href="#/library" aria-current={libraryPage ? "page" : undefined}>Stock library</a>{libraryPage ? <a href="#/">Overview</a> : <button onClick={()=>jump('walkthrough')}>Try a holding</button>}</nav>
       <button className="home-theme" aria-label={dark?'Switch to light mode':'Switch to dark mode'} title={dark?'Switch to light mode':'Switch to dark mode'} onClick={()=>setTheme(dark?'light':'dark')}>{dark?<Sun size={19}/>:<Moon size={19}/>}</button>
       <a className="home-signin" href="#/signin">Sign in <ArrowRight size={15}/></a></header>
-    <main>{libraryPage ? <Discover full/> : <><section className="home-hero"><div className="home-intro">
-      <h1>Know the stocks <em>you own.</em></h1>
+    <main ref={tour}>{libraryPage ? <Discover full/> : <><section className="home-hero"><div className="home-intro">
+      <h1><span>Know the stocks</span> <em>you own.</em></h1>
       <p>Folio is a portfolio tracker for stocks across the US, India and Canada. Keep a watchlist of companies you’re researching and see how the shares you own perform together.</p>
       <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><a className="explore-link" href="#/library">Explore stocks →</a></div>
-    </div><div className="market-stage"><MarketPreview/></div></section><ProductOverview/><Discover/><TradeExample/></>}
+    </div><div className="market-stage" data-motion-group><MarketPreview/></div></section><ProductOverview/><Discover/><TradeExample/></>}
     </main></div></div>;
 }
