@@ -63,6 +63,12 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await page.getByRole('button', { name: 'TCS', exact: true }).click();
   await expect(page.getByRole('img', { name: 'TCS sample closing prices over 22 sessions' })).toBeVisible();
   await expect(page.locator('.preview-quote')).toContainText('INR');
+  await page.getByRole('slider', { name: 'Inspect sample trading session' }).press('Home');
+  await expect(page.locator('.preview-caption')).toContainText('Session 1 of 22');
+  await page.getByRole('slider', { name: /Position weight/ }).press('End');
+  await expect(page.locator('output[for="sample-weight"]')).toHaveText('−10.0%');
+  await page.getByRole('slider', { name: /Time horizon/ }).press('Home');
+  await expect(page.locator('output[for="sample-years"]')).toHaveText('$1,050.00');
   await page.getByRole('link', { name: 'Explore stocks' }).click();
   await expect(page).toHaveURL(/#\/library$/);
   await page.goBack();

@@ -13,7 +13,8 @@ const samples = [
 function MarketPreview() {
   const [selected, select] = useState(0);
   const { symbol, name, market, currency, prices } = samples[selected];
-  const price = prices.at(-1);
+  const [session, setSession] = useState(prices.length - 1);
+  const price = prices[session];
   const change = (price / prices[0] - 1) * 100;
   const min = Math.min(...prices), max = Math.max(...prices);
   const line = prices.map((p,i) => `${i ? 'L' : 'M'}${4+i*472/(prices.length-1)},${123-(p-min)*108/(max-min)}`).join(' ');
@@ -21,17 +22,19 @@ function MarketPreview() {
     <header><span><span className="preview-dot" />Stock explorer</span><small>Sample data</small></header>
     <div className="preview-body">
       <div className="preview-switch" aria-label="Choose an example stock">{samples.map((s,i)=>
-        <button key={s.symbol} aria-pressed={i===selected} onClick={()=>select(i)}>{s.symbol}</button>)}</div>
+        <button key={s.symbol} aria-pressed={i===selected} onClick={()=>{select(i); setSession(s.prices.length-1);}}>{s.symbol}</button>)}</div>
       <div className="preview-quote" aria-live="polite"><div><small>{market} · {name}</small>
         <strong>{new Intl.NumberFormat('en-US',{minimumFractionDigits:2}).format(price)} <em>{currency}</em></strong></div>
         <span className={change<0?'down':''}>{change>0?'+':''}{change.toFixed(2)}%</span></div>
-      <svg className={change<0?'down':''} viewBox="0 0 480 140" role="img" aria-label={`${symbol} sample closing prices over 22 sessions`}>
+      <svg className={prices.at(-1)<prices[0]?'down':''} preserveAspectRatio="none" viewBox="0 0 480 140" role="img" aria-label={`${symbol} sample closing prices over 22 sessions`}>
         <defs><linearGradient id="sample-fill" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop stopColor="currentColor" stopOpacity=".28"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs>
         {[20,65,110].map(y=><path key={y} d={`M0 ${y}h480`} stroke="var(--line)" strokeDasharray="3 5"/>)}
         <path d={line+' L476 140 H4 Z'} fill="url(#sample-fill)"/>
-        <path d={line} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
+        <path key={symbol} className="sample-line" pathLength="1" d={line} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
+        <circle cx={4+session*472/(prices.length-1)} cy={123-(price-min)*108/(max-min)} r="4" fill="currentColor"/>
       </svg>
-      <div className="preview-caption"><span>Daily closing price</span><span>22 trading sessions</span></div>
+      <input className="session-slider" type="range" min="0" max={prices.length-1} value={session} aria-label="Inspect sample trading session" aria-valuetext={`Session ${session+1}, ${price} ${currency}`} onChange={e=>setSession(Number(e.target.value))}/>
+      <div className="preview-caption"><span>Daily closing price</span><span>Session {session+1} of {prices.length}</span></div>
     </div>
   </section>;
 }
@@ -90,16 +93,25 @@ function TradeExample() {
 }
 
 function ProductOverview() {
+  const [weight,setWeight] = useState(50);
+  const [years,setYears] = useState(5);
   return <section className="product-overview" aria-labelledby="overview-title">
     <h2 id="overview-title">What can Folio tell you?</h2>
     <div className="overview-insights">
-      <article><h3>Which holdings drive my returns?</h3><p>Record your trades and compare each position’s saved value with its purchase cost. A small percentage gain on a large holding can contribute more than a big gain on a small one.</p></article>
-      <article><h3>How much depends on one stock?</h3><p>Explore each holding’s share of your portfolio. If one stock accounts for half its value, a 10% drop in that stock would reduce the whole portfolio by 5%, assuming everything else stays flat.</p></article>
-      <article><h3>What if my returns change?</h3><p>Try different time horizons and assumed annual returns in the projection tool. Compare the resulting portfolio values to see how sensitive an estimate is to the assumptions you choose.</p></article>
+      <article><h3>Which holdings drive my returns?</h3><p>A position’s size matters as much as its return. In this example, the stock with the smaller percentage gain contributes more money.</p>
+        <dl className="return-example"><div><dt>$1,000 × 5%</dt><dd>+$50</dd></div><div><dt>$200 × 10%</dt><dd>+$20</dd></div></dl>
+      </article>
+      <article><h3>How much depends on one stock?</h3><p>Suppose one stock falls 10% while everything else stays flat. Adjust its share of the portfolio to see the impact.</p>
+        <div className="insight-control"><label htmlFor="sample-weight">Position weight <b>{weight}%</b></label><input id="sample-weight" type="range" min="1" max="100" value={weight} onChange={e=>setWeight(Number(e.target.value))}/>
+        <div>Portfolio change <output htmlFor="sample-weight">−{(weight/10).toFixed(1)}%</output></div></div>
+      </article>
+      <article><h3>What if my returns change?</h3><p>Explore how $1,000 would grow at an assumed 5% annual return, with gains reinvested and no additional deposits.</p>
+        <div className="insight-control"><label htmlFor="sample-years">Time horizon <b>{years} {years===1?'year':'years'}</b></label><input id="sample-years" type="range" min="1" max="10" value={years} onChange={e=>setYears(Number(e.target.value))}/>
+        <div>Projected value <output htmlFor="sample-years">{(1000*1.05**years).toLocaleString('en-US',{style:'currency',currency:'USD'})}</output></div></div>
+      </article>
     </div>
   </section>;
 }
-
 export default function HomePage({ mark, theme, setTheme, libraryPage }) {
   const jump = id => document.getElementById(id)?.focus();
   const dark = theme === 'dark';
@@ -109,9 +121,9 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
       <button className="home-theme" aria-label={dark?'Switch to light mode':'Switch to dark mode'} title={dark?'Switch to light mode':'Switch to dark mode'} onClick={()=>setTheme(dark?'light':'dark')}>{dark?<Sun size={19}/>:<Moon size={19}/>}</button>
       <a className="home-signin" href="#/signin">Sign in <ArrowRight size={15}/></a></header>
     <main>{libraryPage ? <Discover full/> : <><section className="home-hero"><div className="home-intro">
-      <h1>Know the stocks<br/><em>you own.</em></h1>
+      <h1>Know the stocks <em>you own.</em></h1>
       <p>Folio is a portfolio tracker for stocks across the US, India and Canada. Keep a watchlist of companies you’re researching and see how the shares you own perform together.</p>
       <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><a className="explore-link" href="#/library">Explore stocks →</a></div>
-    </div><MarketPreview/></section><ProductOverview/><Discover/><TradeExample/></>}
+    </div><div className="market-stage"><MarketPreview/></div></section><ProductOverview/><Discover/><TradeExample/></>}
     </main></div></div>;
 }
