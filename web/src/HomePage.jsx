@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowRight, Bookmark, ChartNoAxesCombined, Globe2, Layers } from 'lucide-react';
+import { ArrowRight, Sun, Moon, Search } from 'lucide-react';
+import { marketOf, stockLibrary } from './stockLibrary';
 import './home.css';
 
 // Illustrative observations, independent of the visitor's account and live quote services.
@@ -35,31 +36,55 @@ function MarketPreview() {
   </section>;
 }
 
-export default function HomePage({ mark }) {
+const directory = stockLibrary([], [], false);
+const markets = ['All', 'US', 'Bombay', 'Toronto'];
+
+function Discover() {
+  const [market, setMarket] = useState('All');
+  const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState(false);
+  const matches = directory.filter(stock => (market === 'All' || marketOf(stock.symbol) === market)
+    && [stock.name, stock.symbol, stock.sector].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
+  return <section className="discovery" aria-labelledby="discover">
+    <div className="section-heading"><div><h2 id="discover" tabIndex={-1}>Explore the stock library</h2>
+      <p>Find companies by market or industry. In your account, save the ones you want to follow.</p></div>
+      <label className="company-search"><Search size={17}/><input type="search" aria-label="Search companies" placeholder="Company, ticker or sector" value={query} onChange={e=>{setQuery(e.target.value);setExpanded(false);}}/></label></div>
+    <div className="directory-toolbar"><div className="market-filters">{markets.map(item=><button key={item} aria-pressed={item===market} onClick={()=>{setMarket(item);setExpanded(false);}}>{item}</button>)}</div>
+      <small aria-live="polite">{matches.length} {matches.length===1?'company':'companies'}</small></div>
+    <ul className="company-grid">{(expanded?matches:matches.slice(0,6)).map(({name,symbol,sector})=><li key={symbol}>
+      <div><strong>{name}</strong><small>{symbol} · {marketOf(symbol)}</small></div><span>{sector}</span></li>)}</ul>
+    {!matches.length && <p role="status">No companies match this search. Try another ticker or market.</p>}
+    {matches.length>6 && <button className="catalog-more" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'Show fewer companies':`Show all ${matches.length} companies`}</button>}
+  </section>;
+}
+
+function TradeExample() {
+  const [ticker, setTicker] = useState('AAPL');
+  const [shares, setShares] = useState(10);
+  const {prices,currency} = samples.find(stock=>stock.symbol===ticker);
+  const opening = prices[0], closing = prices.at(-1);
+  const money = amount=>new Intl.NumberFormat('en-US',{style:'currency',currency,currencyDisplay:'code',maximumFractionDigits:2}).format(amount);
+  return <section className="trade-example" aria-labelledby="walkthrough"><div><h2 id="walkthrough" tabIndex={-1}>Try your first holding</h2>
+    <p>Choose a stock and a share count. See what your purchase would have cost and how much it would be worth at the last sample close.</p>
+    <div className="example-controls"><label>Sample stock<select value={ticker} onChange={e=>setTicker(e.target.value)}>{samples.map(s=><option key={s.symbol}>{s.symbol}</option>)}</select></label>
+    <label>Shares <strong>{shares}</strong><input type="range" min="1" max="50" value={shares} onChange={e=>setShares(Number(e.target.value))}/></label></div></div>
+    <dl className="trade-values"><div><dt>Purchase cost <small>{shares} × {money(opening)}</small></dt><dd>{money(shares*opening)}</dd></div>
+    <div><dt>Position value <small>{shares} × {money(closing)}</small></dt><dd>{money(shares*closing)}</dd></div>
+    <div><dt>Unrealized {closing>=opening?'gain':'loss'}</dt><dd className={closing>=opening?'gain':'loss'}>{money(shares*(closing-opening))}</dd></div></dl></section>;
+}
+
+export default function HomePage({ mark, theme, setTheme }) {
   const jump = id => document.getElementById(id)?.focus();
+  const dark = theme === 'dark';
   return <div className="home-page"><div className="home-wrap">
     <header className="home-header"><a href="#/" className="brand" aria-label="Folio home">{mark}folio.</a>
-      <nav aria-label="Product navigation"><button onClick={()=>jump('home-tools')}>Features</button><button onClick={()=>jump('home-start')}>How it works</button></nav>
+      <nav aria-label="Product navigation"><button onClick={()=>jump('discover')}>Stock library</button><button onClick={()=>jump('walkthrough')}>Try a holding</button></nav>
+      <button className="home-theme" aria-label={dark?'Switch to light mode':'Switch to dark mode'} title={dark?'Switch to light mode':'Switch to dark mode'} onClick={()=>setTheme(dark?'light':'dark')}>{dark?<Sun size={19}/>:<Moon size={19}/>}</button>
       <a className="home-signin" href="#/signin">Sign in <ArrowRight size={15}/></a></header>
-    <main>
-      <section className="home-hero"><div className="home-intro">
-        <h1>Your portfolio,<br/><em>in perspective.</em></h1>
-        <p>Track what you own, research your next holding, and see how a change in returns could shape your portfolio.</p>
-        <a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a>
-      </div><MarketPreview /></section>
-      <div className="home-coverage">
-        <div><Globe2/><span><strong>3 markets</strong>US, Bombay and Toronto</span></div>
-        <div><Layers/><span><strong>6 display currencies</strong>USD, INR, EUR, GBP, CAD and JPY</span></div>
-        <div><ChartNoAxesCombined/><span><strong>1–10 year outlook</strong>Adjustable return scenarios</span></div>
-      </div>
-      <section className="home-tools" aria-labelledby="home-tools"><h2 id="home-tools" tabIndex={-1}>Inside your workspace</h2>
-        <div className="home-tools-grid">
-          <article><Layers/><h3>Understand your holdings</h3><p>Record a purchase or sale and see how it changes your cost basis, unrealized return and allocation.</p></article>
-          <article><Bookmark/><h3>Research before you buy</h3><p>Filter stocks by market, save a watchlist and read a performance summary based on recent closing prices.</p></article>
-          <article><ChartNoAxesCombined/><h3>Explore your next move</h3><p>Review concentration with the portfolio analyzer, then change the time horizon and assumed return to compare projected values.</p></article>
-        </div></section>
-      <section className="home-start" aria-labelledby="home-start"><div><h2 id="home-start" tabIndex={-1}>Start with one holding.</h2>
-        <p>Create your account, record a ticker and share count, then open Overview to see your position. Folio tracks trades you enter. Your brokerage handles the orders.</p></div>
-        <a href="#/signup" className="home-cta">Get started <ArrowRight size={17}/></a></section>
+    <main><section className="home-hero"><div className="home-intro">
+      <h1>Know the stocks<br/><em>you own.</em></h1>
+      <p>Follow stocks across the US, India and Canada. Track your trades, compare returns in six currencies and see where your portfolio is concentrated.</p>
+      <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><button onClick={()=>jump('discover')}>Explore stocks ↓</button></div>
+    </div><MarketPreview/></section><Discover/><TradeExample/>
     </main></div></div>;
 }

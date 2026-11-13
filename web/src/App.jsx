@@ -208,6 +208,11 @@ function TradeModal({ initial, pending, submit, close, demo, failureMessage }) {
 }
 
 export default function App() {
+  const [theme, setTheme] = useState(() => readStored('folio-theme', 'dark'));
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
+    store('folio-theme', theme);
+  }, [theme]);
   const [requiresSignIn, setRequiresSignIn] = useState(false);
   const [accountVersion, setAccountVersion] = useState(0);
   const [hash, setHash] = useState(location.hash);
@@ -240,12 +245,12 @@ export default function App() {
   if (requiresSignIn) {
     if (hash === '#/signin' || hash === '#/signup')
       return <SignIn key={hash} initialStep={hash === '#/signup' ? 'signup' : 'login'} onSignedIn={() => setRequiresSignIn(false)} />;
-    return <HomePage mark={<Brand />} />;
+    return <HomePage theme={theme} setTheme={setTheme} mark={<Brand />} />;
   }
-  return <CurrencyProvider><Workspace key={accountVersion} hadSession={hadSession} /></CurrencyProvider>;
+  return <CurrencyProvider><Workspace theme={theme} setTheme={setTheme} key={accountVersion} hadSession={hadSession} /></CurrencyProvider>;
 }
 
-function Workspace({ hadSession }) {
+function Workspace({ hadSession, theme, setTheme }) {
   const { money, signedMoney, rate, currency } = useCurrency();
   const accountMenu = useRef(null);
   useEffect(() => {
@@ -270,7 +275,7 @@ function Workspace({ hadSession }) {
   const [notice, setNotice] = useState(null);
   const [progress, setProgress] = useState(null);
   const [modal, setModal] = useState(null);
-  const [theme, setTheme] = useState(() => readStored('folio-theme', 'dark'));
+
   const [watchlists, setWatchlists] = useState(() => {
     const value = readStored('folio-watchlists', {});
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -329,10 +334,7 @@ function Workspace({ hadSession }) {
     window.addEventListener('hashchange', listener);
     return () => window.removeEventListener('hashchange', listener);
   }, []);
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme === 'light' ? 'light' : 'dark';
-    store('folio-theme', theme);
-  }, [theme]);
+
   useEffect(() => {
     const controller = new AbortController();
     request('/snapshot', { signal: controller.signal })

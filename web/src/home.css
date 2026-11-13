@@ -1,17 +1,17 @@
-.home-page { --ink:#18342d; --dim:#4f635a; color:var(--ink); background:#f8f8f2; color-scheme:light; min-height:100dvh; }
+.home-page { --ink:#ecf3ed; --dim:#b2c2b8; --page:#101914; --panel:#19261e; --line:#35443a; --accent:#b5e8a2; color:var(--ink); background:var(--page); color-scheme:dark; min-height:100dvh; }
 .home-wrap { max-width:1320px; padding:0 clamp(20px,5vw,72px); margin:auto; }
 .home-header,.home-header nav,.home-signin,.home-cta,.home-coverage>div,.market-preview header,.preview-quote,.preview-caption,.home-start { display:flex; align-items:center; }
-.home-header { gap:40px; padding:20px 0; border-bottom:1px solid #ccd5c9; }
+.home-header { gap:18px; padding:17px 0; border-bottom:1px solid var(--line); }
 .home-header .brand { color:var(--ink); }
 .home-header nav { margin-left:auto; gap:24px; }
 .home-header nav button { padding:8px 0; background:transparent; color:var(--dim); }
 .home-signin,.home-cta { gap:12px; width:fit-content; font-weight:600; border-radius:8px; text-decoration:none; }
-.home-signin { border:1px solid #b6c6b9; color:var(--ink); padding:9px 15px; }
+.home-signin { border:1px solid var(--line); color:var(--ink); padding:9px 15px; }
 .home-cta { background:#204c3e; color:#fff; padding:13px 22px; }
 .home-cta:hover { background:#30654e; }
 .home-hero { display:grid; grid-template-columns:1fr 1.05fr; gap:clamp(28px,6vw,86px); align-items:center; padding:clamp(36px,5.5vw,78px) 0; }
 .home-intro h1 { color:var(--ink); font-size:clamp(48px,5.3vw,82px); letter-spacing:-.064em; line-height:1.03; }
-.home-intro h1 em { font-family:Georgia,serif; font-weight:400; color:#426d52; letter-spacing:-.06em; }
+.home-intro h1 em { font-family:Georgia,serif; font-weight:400; color:var(--accent); letter-spacing:-.06em; }
 .home-intro p,.home-tools p,.home-start p { color:var(--dim); line-height:1.6; }
 .home-intro p { max-width:43ch; font-size:clamp(16px,1.4vw,19px); margin:19px 0 25px; }
 .market-preview { min-width:0; background:linear-gradient(128deg,#142e29,#10211f); color:#eff7ef; border-radius:18px; overflow:hidden; box-shadow:0 18px 42px -27px #123d30; }
@@ -29,34 +29,58 @@
 .preview-body svg { display:block; color:#b9eb9e; width:100%; }
 .preview-body .down { color:#ffaba0; }
 .preview-caption { justify-content:space-between; margin-top:4px; }
-.home-coverage,.home-tools-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
-.home-coverage { padding:22px 0; border-block:1px solid #ccd5c9; }
-.home-coverage>div { gap:14px; }
-.home-coverage strong { display:block; color:var(--ink); font-size:18px; }
-.home-coverage span { color:var(--dim); font-size:13px; }
-.home-coverage svg,.home-tools svg { color:#467358; flex-shrink:0; }
-.home-tools { padding:46px 0; }
-.home-tools h2,.home-start h2 { color:var(--ink); font-size:clamp(28px,3vw,42px); letter-spacing:-.05em; }
-.home-tools-grid { gap:16px; margin-top:20px; }
-.home-tools article { padding:24px; border:1px solid #cdd7cb; border-radius:12px; background:#f1f4ea; }
-.home-tools article:nth-child(2) { background:#f0f1eb; }
-.home-tools article:nth-child(3) { background:#eaf1ea; }
-.home-tools h3 { font-size:19px; letter-spacing:-.03em; margin:20px 0 8px; }
-.home-tools p,.home-start p { font-size:14px; }
-.home-start { justify-content:space-between; gap:24px; border-top:1px solid #ccd5c9; padding:34px 0 48px; }
-.home-start p { max-width:65ch; margin-top:9px; }
-.home-page :focus-visible { outline:2px solid #608646; outline-offset:3px; }
-@media (max-width:740px) {
-  .home-hero,.home-tools-grid { grid-template-columns:minmax(0,1fr); }
-  .home-header { gap:14px; }
-  .home-header nav { gap:12px; font-size:12px; }
-  .home-coverage { grid-template-columns:1fr; gap:16px; }
-  .home-tools { padding:28px 0; }
-  .home-tools article { padding:18px; }
-  .home-start { align-items:flex-start; flex-direction:column; }
+:root[data-theme='light'] .home-page { --ink:#172d21; --dim:#516359; --page:#f7f8f3; --panel:#fff; --line:#d1dcd2; --accent:#306644; color-scheme:light; }
+.home-page button { cursor:pointer; }
+.home-theme,.hero-actions button,.catalog-more { color:var(--ink); background:transparent; }
+.home-theme { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--line); border-radius:50%; }
+.hero-actions,.section-heading,.directory-toolbar,.example-controls,.market-filters { display:flex; align-items:center; gap:16px; }
+.hero-actions { flex-wrap:wrap; }
+.hero-actions button,.catalog-more { text-decoration:underline; text-underline-offset:4px; padding:9px 2px; }
+.home-cta { background:var(--ink); color:var(--page); }
+.home-cta:hover { background:var(--accent); }
+.home-header nav button:hover,.hero-actions button:hover,.catalog-more:hover { color:var(--accent); }
+.discovery { border-block:1px solid var(--line); padding:32px 0; }
+.home-page h2 { font-size:clamp(25px,3vw,40px); letter-spacing:-.05em; line-height:1.15; }
+.discovery p,.trade-example p { color:var(--dim); line-height:1.6; margin:8px 0; }
+.section-heading,.directory-toolbar { justify-content:space-between; }
+.company-search { display:flex; align-items:center; gap:8px; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:0 12px; color:var(--dim); }
+.company-search input { width:22ch; min-width:0; background:transparent; border:0; color:var(--ink); padding:12px 0; }
+.directory-toolbar { margin:20px 0 12px; flex-wrap:wrap; }
+.directory-toolbar small,.company-grid small,.trade-values small { color:var(--dim); font-size:12px; }
+.market-filters { gap:5px; flex-wrap:wrap; }
+.market-filters button { padding:7px 13px; border-radius:20px; color:var(--dim); background:transparent; border:1px solid var(--line); }
+.market-filters [aria-pressed=true] { background:var(--ink); color:var(--page); border-color:var(--ink); }
+.company-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; background:var(--line); padding:0; list-style:none; margin:0; border-radius:12px; overflow:hidden; }
+.company-grid li { display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--panel); padding:15px 18px; }
+.company-grid li:last-child:nth-child(odd) { grid-column:1 / -1; }
+.company-grid small,.trade-values small { display:block; margin-top:4px; }
+.company-grid li>span { color:var(--dim); font-size:12px; text-align:right; }
+.catalog-more { margin-top:8px; }
+.trade-example { display:grid; grid-template-columns:1fr 1fr; gap:clamp(20px,6vw,78px); align-items:center; padding:44px 0 58px; }
+.example-controls { margin-top:20px; flex-wrap:wrap; }
+.example-controls label { display:block; font-size:14px; }
+.example-controls strong { float:right; }
+.example-controls select,.example-controls input { display:block; margin-top:5px; accent-color:var(--accent); }
+.example-controls select { background:var(--panel); color:var(--ink); border:1px solid var(--line); padding:6px 10px; border-radius:6px; }
+.trade-values { margin:0; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:4px 18px; }
+.trade-values>div { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:15px 0; }
+.trade-values>div+div { border-top:1px solid var(--line); }
+.trade-values dd { margin:0; font-weight:600; font-variant-numeric:tabular-nums; }
+.trade-values .gain { color:var(--accent); }
+.trade-values .loss { color:#f59391; }
+:root[data-theme='light'] .trade-values .loss { color:#aa3434; }
+.home-page :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+@media(max-width:740px) {
+  .home-hero,.trade-example,.company-grid { grid-template-columns:minmax(0,1fr); }
+  .section-heading { align-items:stretch; flex-direction:column; }
+  .company-search input { width:100%; }
+  .home-header { gap:10px; }
+  .home-header nav { gap:12px; }
 }
-@media (max-width:470px) {
-  .home-header nav { display:none; }
-  .home-signin { margin-left:auto; }
+@media(max-width:540px) {
+  .home-header { flex-wrap:wrap; padding:12px 0 8px; }
+  .home-header nav { order:1; flex-basis:100%; }
+  .home-theme { margin-left:auto; }
+  .market-filters button { padding:7px 11px; }
   .preview-body,.market-preview header { padding-inline:16px; }
 }
