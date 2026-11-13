@@ -60,6 +60,14 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await page.route('**/api/auth/login', route => route.fulfill({ status: 401, json: { error: 'Incorrect username or password.' } }));
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Your portfolio, in perspective.' })).toBeVisible();
+  await page.getByRole('button', { name: 'TCS', exact: true }).click();
+  await expect(page.getByRole('img', { name: 'TCS sample closing prices over 22 sessions' })).toBeVisible();
+  await expect(page.locator('.preview-quote')).toContainText('INR');
+  await page.getByRole('button', { name: 'Features', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Inside your workspace' })).toBeFocused();
+  await page.setViewportSize({ width: 320, height: 700 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.getByRole('link', { name: 'Create an account' }).click();
   await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
   await page.getByRole('link', { name: 'Folio home' }).click();

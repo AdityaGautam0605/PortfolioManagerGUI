@@ -38,6 +38,7 @@ import { CurrencyProvider, CurrencyPicker, useCurrency } from './Currency.jsx';
 import PortfolioOutlook from './PortfolioOutlook.jsx';
 import PerformanceSummary from './PerformanceSummary.jsx';
 import SignIn from './SignIn.jsx';
+import HomePage from './HomePage.jsx';
 import { trackSession } from './session.js';
 
 const icons = { AAPL: 'A', NVDA: 'N', MSFT: 'M', GOOGL: 'G', AMZN: 'a', TSLA: 'T', META: '∞' };
@@ -239,32 +240,9 @@ export default function App() {
   if (requiresSignIn) {
     if (hash === '#/signin' || hash === '#/signup')
       return <SignIn key={hash} initialStep={hash === '#/signup' ? 'signup' : 'login'} onSignedIn={() => setRequiresSignIn(false)} />;
-    return <HomePage />;
+    return <HomePage mark={<Brand />} />;
   }
   return <CurrencyProvider><Workspace key={accountVersion} hadSession={hadSession} /></CurrencyProvider>;
-}
-
-function HomePage() {
-  return <div className="home-page">
-    <header className="home-header">
-      <a href="#/" className="brand" aria-label="Folio home"><Brand />folio.</a>
-      <a className="button subtle" href="#/signin">Sign in</a>
-    </header>
-    <main className="home-hero">
-      <div className="home-intro">
-        <h1>Your portfolio,<br />in perspective.</h1>
-        <p>See what you own, follow stocks across markets, and explore how your portfolio could change over time.</p>
-        <div className="home-actions"><a href="#/signup" className="button primary">Create an account <ArrowRight size={16} /></a>
-          <a href="#/signin" className="text-button">Sign in</a></div>
-      </div>
-      <section className="panel home-preview" aria-label="Example portfolio allocation">
-        <div className="panel-topline"><h2>Portfolio allocation</h2><small>Example</small></div>
-        <div className="home-donut" role="img" aria-label="US 55%, India 30%, Canada 15%"><span>3 markets</span></div>
-        <ul>{[['US',55],['India',30],['Canada',15]].map(([market,weight],i)=>
-          <li key={market}><i style={{background:`var(--allocation-${i})`}} />{market}<strong>{weight}%</strong></li>)}</ul>
-      </section>
-    </main>
-  </div>;
 }
 
 function Workspace({ hadSession }) {
