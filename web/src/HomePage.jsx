@@ -14,34 +14,34 @@ function MarketPreview() {
   const [selected, select] = useState(0);
   const { symbol, name, market, currency, prices } = samples[selected];
   const [session, setSession] = useState(prices.length - 1);
-  const [rotating, setRotating] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const [autoRotate, setAutoRotate] = useState(() => !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   useEffect(() => {
     const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const stopIfReduced = () => { if (preference.matches) setRotating(false); };
-    preference.addEventListener('change', stopIfReduced);
-    return () => preference.removeEventListener('change', stopIfReduced);
+    const syncPreference = () => setAutoRotate(!preference.matches);
+    preference.addEventListener('change', syncPreference);
+    return () => preference.removeEventListener('change', syncPreference);
   }, []);
   useEffect(() => {
-    if (!rotating) return;
+    if (!autoRotate) return;
     const next = (selected + 1) % samples.length;
     const timer = window.setTimeout(() => {
       select(next);
       setSession(samples[next].prices.length - 1);
     }, 8000);
     return () => window.clearTimeout(timer);
-  }, [selected, rotating]);
+  }, [selected, autoRotate]);
   const price = prices[session];
   const change = (price / prices[0] - 1) * 100;
   const min = Math.min(...prices), max = Math.max(...prices);
   const line = prices.map((p,i) => `${i ? 'L' : 'M'}${4+i*472/(prices.length-1)},${123-(p-min)*108/(max-min)}`).join(' ');
   return <section className="market-preview" aria-label="Interactive sample stock chart">
-    <header><span><span className="preview-dot" />Stock explorer</span><div className="rotation-controls"><small>Sample data</small><button type="button" aria-label={rotating ? 'Pause stock rotation' : 'Resume stock rotation'} onClick={()=>setRotating(!rotating)}>{rotating ? 'Pause' : 'Resume'}</button></div></header>
+    <header><span><span className="preview-dot" />Stock explorer</span><small>Sample data</small></header>
     <div className="preview-layout">
       <div className="preview-switch" aria-label="Choose an example stock">{samples.map((stock,i)=>
-        <button key={stock.symbol} data-motion-part aria-label={stock.symbol} aria-pressed={i===selected} onClick={()=>{setRotating(false); select(i); setSession(stock.prices.length-1);}}>
+        <button key={stock.symbol} data-motion-part aria-label={stock.symbol} aria-pressed={i===selected} onClick={()=>{select(i); setSession(stock.prices.length-1);}}>
           <strong>{stock.symbol}</strong><span>{stock.name}</span><small>{stock.currency} {stock.prices.at(-1).toFixed(2)}</small>
         </button>)}</div>
-      <div className="preview-body" data-motion-part><div className="preview-quote" aria-live={rotating ? 'off' : 'polite'}><div><small>{market} · {name}</small>
+      <div className="preview-body" data-motion-part><div className="preview-quote" aria-live={autoRotate ? 'off' : 'polite'}><div><small>{market} · {name}</small>
         <strong>{new Intl.NumberFormat('en-US',{minimumFractionDigits:2}).format(price)} <em>{currency}</em></strong></div>
         <span className={change<0?'down':''}>{change>0?'+':''}{change.toFixed(2)}%</span></div>
       <svg className={prices.at(-1)<prices[0]?'down':''} preserveAspectRatio="none" viewBox="0 0 480 140" role="img" aria-label={`${symbol} sample closing prices over 22 sessions`}>
@@ -50,7 +50,7 @@ function MarketPreview() {
         <path key={symbol} className="sample-line" pathLength="1" d={line} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
         <circle cx={4+session*472/(prices.length-1)} cy={123-(price-min)*108/(max-min)} r="4" fill="currentColor"/>
       </svg>
-      <input className="session-slider" type="range" min="0" max={prices.length-1} value={session} aria-label="Inspect sample trading session" aria-valuetext={`Session ${session+1}, ${price} ${currency}`} onFocus={()=>setRotating(false)} onChange={e=>{setRotating(false); setSession(Number(e.target.value));}}/>
+      <input className="session-slider" type="range" min="0" max={prices.length-1} value={session} aria-label="Inspect sample trading session" aria-valuetext={`Session ${session+1}, ${price} ${currency}`} onChange={e=>setSession(Number(e.target.value))}/>
       <div className="preview-caption"><span>Daily closing price</span><span>Session {session+1} of {prices.length}</span></div></div>
     </div>
   </section>;
@@ -138,14 +138,14 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
     const observer = new IntersectionObserver(entries => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
-        observer.unobserve(entry.target);
+        if (entry.target.contains(document.activeElement)) continue;
         if (preference.matches) continue;
         const parts = entry.target.querySelectorAll('[data-motion-part]');
         parts.forEach((part, index) => {
           const animation = part.animate([
             { opacity: 0, transform: 'translateY(20px)' },
             { opacity: 1, transform: 'translateY(0)' }
-          ], { duration: 950, delay: index * 135, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'backwards' });
+          ], { duration: 950, delay: Math.min(index, 5) * 135, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'backwards' });
           animations.add(animation);
           animation.onfinish = () => animations.delete(animation);
         });
@@ -158,7 +158,7 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
           trace.onfinish = () => animations.delete(trace);
         }
       }
-    }, { threshold: 0.08 });
+    }, { threshold: 0 });
     tour.current.querySelectorAll('[data-motion-group]').forEach(group => observer.observe(group));
     function stopMotion() {
       for (const animation of animations) animation.cancel();

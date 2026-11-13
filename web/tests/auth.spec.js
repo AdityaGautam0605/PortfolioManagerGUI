@@ -177,7 +177,7 @@ test('another tab changing accounts clears the old workspace', async ({ page, co
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('sample stocks rotate and manual selection pauses the chart', async ({ page }) => {
+test('sample stocks continue rotating after selecting a stock and inspecting a session', async ({ page }) => {
   await page.route('**/api/snapshot', route => route.fulfill({ status: 401, json: {} }));
   await page.clock.install();
   await page.goto('/');
@@ -186,9 +186,9 @@ test('sample stocks rotate and manual selection pauses the chart', async ({ page
   await page.clock.fastForward(8000);
   await expect(stock('TCS')).toHaveAttribute('aria-pressed', 'true');
   await stock('SHOP').click();
-  await page.clock.fastForward(16000);
+  await page.getByRole('slider', { name: 'Inspect sample trading session' }).press('Home');
   await expect(stock('SHOP')).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Resume stock rotation' }).click();
+  await expect(page.getByRole('button', { name: /pause|resume/i })).toHaveCount(0);
   await page.clock.fastForward(8000);
   await expect(stock('AAPL')).toHaveAttribute('aria-pressed', 'true');
 });
