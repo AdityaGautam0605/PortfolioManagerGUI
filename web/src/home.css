@@ -1,5 +1,5 @@
 .home-page { --ink:#f4f4f5; --dim:#b4b4bb; --page:#101012; --panel:#19191d; --line:#39393f; --accent:#ccccd2; color:var(--ink); background:var(--page); --gain:#71d9a1; --loss:#ff9999; color-scheme:dark; min-height:100dvh; }
-.home-wrap { max-width:1320px; padding:0 clamp(20px,5vw,72px); margin:auto; }
+.home-wrap { width:100%; padding-inline:clamp(16px,3vw,56px); }
 .home-header,.home-header nav,.home-signin,.home-cta,.home-coverage>div,.market-preview header,.preview-quote,.preview-caption,.home-start { display:flex; align-items:center; }
 .home-header { gap:18px; padding:17px 0; border-bottom:1px solid var(--line); }
 .home-header .brand { color:var(--ink); }
@@ -9,11 +9,11 @@
 .home-signin { border:1px solid var(--line); color:var(--ink); padding:9px 15px; }
 .home-cta { background:var(--ink); color:#fff; padding:13px 22px; }
 .home-cta:hover { background:var(--accent); }
-.home-hero { display:grid; grid-template-columns:1fr 1.05fr; gap:clamp(28px,6vw,86px); align-items:center; padding:clamp(36px,5.5vw,78px) 0; }
+.home-hero { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:clamp(24px,4vw,72px); align-items:center; padding:clamp(28px,3.5vw,52px) 0; }
 .home-intro h1 { color:var(--ink); font-size:clamp(48px,5.3vw,82px); letter-spacing:-.064em; line-height:1.03; }
 .home-intro h1 em { font-family:Georgia,serif; font-weight:400; color:var(--accent); letter-spacing:-.06em; }
 .home-intro p,.home-tools p,.home-start p { color:var(--dim); line-height:1.6; }
-.home-intro p { max-width:43ch; font-size:clamp(16px,1.4vw,19px); margin:19px 0 25px; }
+.home-intro p { max-width:54ch; font-size:clamp(16px,1.4vw,19px); margin:19px 0 25px; }
 .market-preview { min-width:0; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:18px; overflow:hidden; box-shadow:0 18px 42px -27px #0002; }
 .market-preview header { justify-content:space-between; border-bottom:1px solid var(--line); padding:16px 25px; font-weight:600; }
 .market-preview small,.preview-caption { color:var(--dim); font-weight:400; font-size:12px; }
@@ -94,3 +94,13 @@
 .company-row span+span { color:var(--dim); font-size:12px; text-align:right; }
 .company-row:focus-visible { outline-offset:-3px; }
 .listing-details { display:grid; gap:8px; padding:12px 18px; font-size:14px; }
+.product-overview { border-top:1px solid var(--line); padding:32px 0; }
+.overview-insights { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:clamp(16px,3vw,48px); margin-top:20px; }
+.overview-insights h3 { font-size:18px; line-height:1.35; }
+.overview-insights p { max-width:54ch; margin:8px 0 0; color:var(--dim); line-height:1.6; }
+.trade-example { row-gap:14px; }
+.trade-example .holding-explanation { grid-column:2; max-width:65ch; margin:0; font-size:14px; }
+@media(max-width:740px) {
+  .overview-insights { grid-template-columns:1fr; }
+  .trade-example .holding-explanation { grid-column:1; }
+}

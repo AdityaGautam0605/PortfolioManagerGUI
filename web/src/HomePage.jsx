@@ -74,16 +74,30 @@ function Discover({ full = false }) {
 function TradeExample() {
   const [ticker, setTicker] = useState('AAPL');
   const [shares, setShares] = useState(10);
-  const {prices,currency} = samples.find(stock=>stock.symbol===ticker);
+  const {name,prices,currency} = samples.find(stock=>stock.symbol===ticker);
   const opening = prices[0], closing = prices.at(-1);
   const money = amount=>new Intl.NumberFormat('en-US',{style:'currency',currency,currencyDisplay:'code',maximumFractionDigits:2}).format(amount);
   return <section className="trade-example" aria-labelledby="walkthrough"><div><h2 id="walkthrough" tabIndex={-1}>Try your first holding</h2>
-    <p>Choose a stock and a share count. See what your purchase would have cost and how much it would be worth at the last sample close.</p>
+    <p>A stock represents ownership in a company. A share is one unit of that ownership. Choose a company and a share count to see how a price change affects a holding.</p>
     <div className="example-controls"><label>Sample stock<select value={ticker} onChange={e=>setTicker(e.target.value)}>{samples.map(s=><option key={s.symbol}>{s.symbol}</option>)}</select></label>
     <label>Shares <strong>{shares}</strong><input type="range" min="1" max="50" value={shares} onChange={e=>setShares(Number(e.target.value))}/></label></div></div>
     <dl className="trade-values"><div><dt>Purchase cost <small>{shares} × {money(opening)}</small></dt><dd>{money(shares*opening)}</dd></div>
     <div><dt>Position value <small>{shares} × {money(closing)}</small></dt><dd>{money(shares*closing)}</dd></div>
-    <div><dt>Unrealized {closing>=opening?'gain':'loss'}</dt><dd className={closing>=opening?'gain':'loss'}>{money(shares*(closing-opening))}</dd></div></dl></section>;
+    <div><dt>Unrealized {closing>=opening?'gain':'loss'}</dt><dd className={closing>=opening?'gain':'loss'}>{money(shares*(closing-opening))}</dd></div></dl>
+    <p className="holding-explanation">In this example, {name} moved from {money(opening)} to {money(closing)} per share.
+      Your {shares === 1 ? 'share is' : `${shares} shares are`} worth {money(shares*Math.abs(closing-opening))} {closing>=opening?'more':'less'} than you paid.
+      The {closing>=opening?'gain':'loss'} is unrealized because you still own the {shares===1?'share':'shares'}.</p></section>;
+}
+
+function ProductOverview() {
+  return <section className="product-overview" aria-labelledby="overview-title">
+    <h2 id="overview-title">What can Folio tell you?</h2>
+    <div className="overview-insights">
+      <article><h3>Which holdings drive my returns?</h3><p>Record your trades and compare each position’s saved value with its purchase cost. A small percentage gain on a large holding can contribute more than a big gain on a small one.</p></article>
+      <article><h3>How much depends on one stock?</h3><p>Explore each holding’s share of your portfolio. If one stock accounts for half its value, a 10% drop in that stock would reduce the whole portfolio by 5%, assuming everything else stays flat.</p></article>
+      <article><h3>What if my returns change?</h3><p>Try different time horizons and assumed annual returns in the projection tool. Compare the resulting portfolio values to see how sensitive an estimate is to the assumptions you choose.</p></article>
+    </div>
+  </section>;
 }
 
 export default function HomePage({ mark, theme, setTheme, libraryPage }) {
@@ -96,8 +110,8 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
       <a className="home-signin" href="#/signin">Sign in <ArrowRight size={15}/></a></header>
     <main>{libraryPage ? <Discover full/> : <><section className="home-hero"><div className="home-intro">
       <h1>Know the stocks<br/><em>you own.</em></h1>
-      <p>Follow stocks across the US, India and Canada. Track your trades, compare returns in six currencies and see where your portfolio is concentrated.</p>
+      <p>Folio is a portfolio tracker for stocks across the US, India and Canada. Keep a watchlist of companies you’re researching and see how the shares you own perform together.</p>
       <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><a className="explore-link" href="#/library">Explore stocks →</a></div>
-    </div><MarketPreview/></section><Discover/><TradeExample/></>}
+    </div><MarketPreview/></section><ProductOverview/><Discover/><TradeExample/></>}
     </main></div></div>;
 }
