@@ -130,14 +130,14 @@ export default function HomePage({ mark, theme, setTheme, libraryPage }) {
           const animation = part.animate([
             { opacity: 0, transform: 'translateY(20px)' },
             { opacity: 1, transform: 'translateY(0)' }
-          ], { duration: 580, delay: index * 95, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'backwards' });
+          ], { duration: 950, delay: index * 135, easing: 'cubic-bezier(.2,.75,.2,1)', fill: 'backwards' });
           animations.add(animation);
           animation.onfinish = () => animations.delete(animation);
         });
         const line = entry.target.querySelector('.sample-line');
         if (line) {
           const trace = line.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], {
-            duration: 850, delay: 360, easing: 'ease-out', fill: 'backwards'
+            duration: 1450, delay: 480, easing: 'ease-out', fill: 'backwards'
           });
           animations.add(trace);
           trace.onfinish = () => animations.delete(trace);
