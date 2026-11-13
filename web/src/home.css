@@ -1,4 +1,4 @@
-.home-page { --ink:#ecf3ed; --dim:#b2c2b8; --page:#101914; --panel:#19261e; --line:#35443a; --accent:#b5e8a2; color:var(--ink); background:var(--page); color-scheme:dark; min-height:100dvh; }
+.home-page { --ink:#f4f4f5; --dim:#b4b4bb; --page:#101012; --panel:#19191d; --line:#39393f; --accent:#ccccd2; color:var(--ink); background:var(--page); --gain:#71d9a1; --loss:#ff9999; color-scheme:dark; min-height:100dvh; }
 .home-wrap { max-width:1320px; padding:0 clamp(20px,5vw,72px); margin:auto; }
 .home-header,.home-header nav,.home-signin,.home-cta,.home-coverage>div,.market-preview header,.preview-quote,.preview-caption,.home-start { display:flex; align-items:center; }
 .home-header { gap:18px; padding:17px 0; border-bottom:1px solid var(--line); }
@@ -7,29 +7,29 @@
 .home-header nav button { padding:8px 0; background:transparent; color:var(--dim); }
 .home-signin,.home-cta { gap:12px; width:fit-content; font-weight:600; border-radius:8px; text-decoration:none; }
 .home-signin { border:1px solid var(--line); color:var(--ink); padding:9px 15px; }
-.home-cta { background:#204c3e; color:#fff; padding:13px 22px; }
-.home-cta:hover { background:#30654e; }
+.home-cta { background:var(--ink); color:#fff; padding:13px 22px; }
+.home-cta:hover { background:var(--accent); }
 .home-hero { display:grid; grid-template-columns:1fr 1.05fr; gap:clamp(28px,6vw,86px); align-items:center; padding:clamp(36px,5.5vw,78px) 0; }
 .home-intro h1 { color:var(--ink); font-size:clamp(48px,5.3vw,82px); letter-spacing:-.064em; line-height:1.03; }
 .home-intro h1 em { font-family:Georgia,serif; font-weight:400; color:var(--accent); letter-spacing:-.06em; }
 .home-intro p,.home-tools p,.home-start p { color:var(--dim); line-height:1.6; }
 .home-intro p { max-width:43ch; font-size:clamp(16px,1.4vw,19px); margin:19px 0 25px; }
-.market-preview { min-width:0; background:linear-gradient(128deg,#142e29,#10211f); color:#eff7ef; border-radius:18px; overflow:hidden; box-shadow:0 18px 42px -27px #123d30; }
-.market-preview header { justify-content:space-between; border-bottom:1px solid #ffffff21; padding:16px 25px; font-weight:600; }
-.market-preview small,.preview-caption { color:#bbcec3; font-weight:400; font-size:12px; }
-.preview-dot { display:inline-block; width:9px; height:9px; margin-right:9px; border-radius:50%; background:#b2df95; }
+.market-preview { min-width:0; background:var(--panel); border:1px solid var(--line); color:var(--ink); border-radius:18px; overflow:hidden; box-shadow:0 18px 42px -27px #0002; }
+.market-preview header { justify-content:space-between; border-bottom:1px solid var(--line); padding:16px 25px; font-weight:600; }
+.market-preview small,.preview-caption { color:var(--dim); font-weight:400; font-size:12px; }
+.preview-dot { display:inline-block; width:9px; height:9px; margin-right:9px; border-radius:50%; background:var(--dim); }
 .preview-body { padding:20px 25px 17px; }
 .preview-switch { display:flex; gap:6px; }
-.preview-switch button { padding:7px 13px; border-radius:6px; color:#c5d6cd; background:transparent; font-size:12px; font-weight:600; }
-.preview-switch button[aria-pressed=true] { background:#355347; color:white; }
+.preview-switch button { padding:7px 13px; border-radius:6px; color:var(--dim); background:transparent; font-size:12px; font-weight:600; }
+.preview-switch button[aria-pressed=true] { background:var(--ink); color:var(--page); }
 .preview-quote { margin:18px 0 9px; justify-content:space-between; gap:8px; }
 .preview-quote strong { display:block; font-size:clamp(28px,3vw,42px); letter-spacing:-.05em; }
-.preview-quote em { font-size:12px; color:#bbcec3; font-style:normal; letter-spacing:normal; }
-.preview-quote>span { color:#c2eda4; font-variant-numeric:tabular-nums; }
-.preview-body svg { display:block; color:#b9eb9e; width:100%; }
-.preview-body .down { color:#ffaba0; }
+.preview-quote em { font-size:12px; color:var(--dim); font-style:normal; letter-spacing:normal; }
+.preview-quote>span { color:var(--gain); font-variant-numeric:tabular-nums; }
+.preview-body svg { display:block; color:var(--gain); width:100%; }
+.preview-body .down { color:var(--loss); }
 .preview-caption { justify-content:space-between; margin-top:4px; }
-:root[data-theme='light'] .home-page { --ink:#172d21; --dim:#516359; --page:#f7f8f3; --panel:#fff; --line:#d1dcd2; --accent:#306644; color-scheme:light; }
+:root[data-theme='light'] .home-page { --ink:#202024; --dim:#54545b; --page:#fafafa; --panel:#fff; --line:#dedee2; --accent:#515158; --gain:#127246; --loss:#ac303d; color-scheme:light; }
 .home-page button { cursor:pointer; }
 .home-theme,.hero-actions button,.catalog-more { color:var(--ink); background:transparent; }
 .home-theme { display:grid; place-items:center; width:40px; height:40px; border:1px solid var(--line); border-radius:50%; }
@@ -66,7 +66,7 @@
 .trade-values>div { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:15px 0; }
 .trade-values>div+div { border-top:1px solid var(--line); }
 .trade-values dd { margin:0; font-weight:600; font-variant-numeric:tabular-nums; }
-.trade-values .gain { color:var(--accent); }
+.trade-values .gain { color:var(--gain); }
 .trade-values .loss { color:#f59391; }
 :root[data-theme='light'] .trade-values .loss { color:#aa3434; }
 .home-page :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
@@ -84,3 +84,13 @@
   .market-filters button { padding:7px 11px; }
   .preview-body,.market-preview header { padding-inline:16px; }
 }
+.home-header nav a,.explore-link,.listing-details a { color:var(--ink); text-underline-offset:4px; }
+.home-header nav a { color:var(--dim); text-decoration:none; }
+.home-header nav a:hover,.home-header nav [aria-current=page] { color:var(--ink); text-decoration:underline; }
+.discovery h1 { font-size:clamp(30px,4vw,50px); letter-spacing:-.05em; }
+.company-grid li { display:block; padding:0; }
+.company-row { width:100%; display:flex; justify-content:space-between; align-items:center; gap:12px; padding:15px 18px; color:var(--ink); background:transparent; text-align:left; }
+.company-row:hover,.company-row[aria-expanded=true] { background:var(--page); }
+.company-row span+span { color:var(--dim); font-size:12px; text-align:right; }
+.company-row:focus-visible { outline-offset:-3px; }
+.listing-details { display:grid; gap:8px; padding:12px 18px; font-size:14px; }

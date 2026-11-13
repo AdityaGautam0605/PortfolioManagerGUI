@@ -63,7 +63,10 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await page.getByRole('button', { name: 'TCS', exact: true }).click();
   await expect(page.getByRole('img', { name: 'TCS sample closing prices over 22 sessions' })).toBeVisible();
   await expect(page.locator('.preview-quote')).toContainText('INR');
-  await page.getByRole('button', { name: 'Stock library', exact: true }).click();
+  await page.getByRole('link', { name: 'Explore stocks' }).click();
+  await expect(page).toHaveURL(/#\/library$/);
+  await page.goBack();
+  await page.getByRole('link', { name: 'Stock library', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Explore the stock library' })).toBeFocused();
   await page.getByRole('button', { name: 'Switch to light mode' }).click();
   await page.reload();
@@ -72,6 +75,9 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await page.getByRole('searchbox').fill('technology');
   await expect(page.locator('.company-grid li')).toHaveCount(1);
   await expect(page.locator('.company-grid')).toContainText('Tata Consultancy Services');
+  await page.getByRole('button', { name: /Tata Consultancy Services/ }).click();
+  await expect(page.locator('.listing-details')).toContainText('INR');
+  await page.getByRole('link', { name: 'Folio home' }).click();
   await page.getByRole('combobox', { name: /Sample stock/ }).selectOption('TCS');
   await expect(page.locator('.trade-values')).toContainText('Unrealized loss');
   await page.setViewportSize({ width: 320, height: 700 });

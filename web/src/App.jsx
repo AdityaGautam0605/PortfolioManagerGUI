@@ -220,7 +220,7 @@ export default function App() {
   useEffect(() => {
     const onHash = () => setHash(location.hash);
     const listener = () => {
-      if (hadSession.current || !['', '#/', '#/signin', '#/signup'].includes(location.hash)) {
+      if (hadSession.current || !['', '#/', '#/library', '#/signin', '#/signup'].includes(location.hash)) {
         location.hash = '/signin';
       }
       hadSession.current = false;
@@ -245,7 +245,7 @@ export default function App() {
   if (requiresSignIn) {
     if (hash === '#/signin' || hash === '#/signup')
       return <SignIn key={hash} initialStep={hash === '#/signup' ? 'signup' : 'login'} onSignedIn={() => setRequiresSignIn(false)} />;
-    return <HomePage theme={theme} setTheme={setTheme} mark={<Brand />} />;
+    return <HomePage libraryPage={hash === '#/library'} theme={theme} setTheme={setTheme} mark={<Brand />} />;
   }
   return <CurrencyProvider><Workspace theme={theme} setTheme={setTheme} key={accountVersion} hadSession={hadSession} /></CurrencyProvider>;
 }

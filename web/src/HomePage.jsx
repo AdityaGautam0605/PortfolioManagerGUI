@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowRight, Sun, Moon, Search } from 'lucide-react';
-import { marketOf, stockLibrary } from './stockLibrary';
+import { marketOf, quoteCurrency, stockLibrary } from './stockLibrary';
 import './home.css';
 
 // Illustrative observations, independent of the visitor's account and live quote services.
@@ -27,7 +27,7 @@ function MarketPreview() {
         <span className={change<0?'down':''}>{change>0?'+':''}{change.toFixed(2)}%</span></div>
       <svg className={change<0?'down':''} viewBox="0 0 480 140" role="img" aria-label={`${symbol} sample closing prices over 22 sessions`}>
         <defs><linearGradient id="sample-fill" x2="0" y2="1" gradientUnits="objectBoundingBox"><stop stopColor="currentColor" stopOpacity=".28"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs>
-        {[20,65,110].map(y=><path key={y} d={`M0 ${y}h480`} stroke="#ffffff20" strokeDasharray="3 5"/>)}
+        {[20,65,110].map(y=><path key={y} d={`M0 ${y}h480`} stroke="var(--line)" strokeDasharray="3 5"/>)}
         <path d={line+' L476 140 H4 Z'} fill="url(#sample-fill)"/>
         <path d={line} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinejoin="round"/>
       </svg>
@@ -39,22 +39,35 @@ function MarketPreview() {
 const directory = stockLibrary([], [], false);
 const markets = ['All', 'US', 'Bombay', 'Toronto'];
 
-function Discover() {
+function Discover({ full = false }) {
   const [market, setMarket] = useState('All');
   const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [selected, setSelected] = useState('');
+  useEffect(() => {
+    if (full) {
+      document.getElementById('discover')?.focus({ preventScroll: true });
+      window.scrollTo(0, 0);
+    }
+  }, [full]);
+  const Heading = full ? 'h1' : 'h2';
   const matches = directory.filter(stock => (market === 'All' || marketOf(stock.symbol) === market)
     && [stock.name, stock.symbol, stock.sector].join(' ').toLowerCase().includes(query.trim().toLowerCase()));
   return <section className="discovery" aria-labelledby="discover">
-    <div className="section-heading"><div><h2 id="discover" tabIndex={-1}>Explore the stock library</h2>
-      <p>Find companies by market or industry. In your account, save the ones you want to follow.</p></div>
+    <div className="section-heading"><div><Heading id="discover" tabIndex={-1}>Explore the stock library</Heading>
+      <p>Search by name, ticker or industry. Select a company to explore its listing.</p></div>
       <label className="company-search"><Search size={17}/><input type="search" aria-label="Search companies" placeholder="Company, ticker or sector" value={query} onChange={e=>{setQuery(e.target.value);setExpanded(false);}}/></label></div>
     <div className="directory-toolbar"><div className="market-filters">{markets.map(item=><button key={item} aria-pressed={item===market} onClick={()=>{setMarket(item);setExpanded(false);}}>{item}</button>)}</div>
       <small aria-live="polite">{matches.length} {matches.length===1?'company':'companies'}</small></div>
-    <ul className="company-grid">{(expanded?matches:matches.slice(0,6)).map(({name,symbol,sector})=><li key={symbol}>
-      <div><strong>{name}</strong><small>{symbol} · {marketOf(symbol)}</small></div><span>{sector}</span></li>)}</ul>
+    <ul className="company-grid">{(full || expanded?matches:matches.slice(0,6)).map(({name,symbol,sector})=><li key={symbol}>
+      <button className="company-row" aria-expanded={selected===symbol} onClick={()=>setSelected(selected===symbol?'':symbol)}>
+        <span><strong>{name}</strong><small>{symbol} · {marketOf(symbol)}</small></span><span>{sector} {selected===symbol?'−':'+'}</span>
+      </button>
+      {selected===symbol && <div className="listing-details">Quote currency · {quoteCurrency(symbol)}
+        <a href={'https://finance.yahoo.com/lookup/?s='+encodeURIComponent(name)} target="_blank" rel="noreferrer">Research {name} on Yahoo Finance ↗</a>
+      </div>}</li>)}</ul>
     {!matches.length && <p role="status">No companies match this search. Try another ticker or market.</p>}
-    {matches.length>6 && <button className="catalog-more" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'Show fewer companies':`Show all ${matches.length} companies`}</button>}
+    {!full && matches.length>6 && <button className="catalog-more" aria-expanded={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'Show fewer companies':`Show all ${matches.length} companies`}</button>}
   </section>;
 }
 
@@ -73,18 +86,18 @@ function TradeExample() {
     <div><dt>Unrealized {closing>=opening?'gain':'loss'}</dt><dd className={closing>=opening?'gain':'loss'}>{money(shares*(closing-opening))}</dd></div></dl></section>;
 }
 
-export default function HomePage({ mark, theme, setTheme }) {
+export default function HomePage({ mark, theme, setTheme, libraryPage }) {
   const jump = id => document.getElementById(id)?.focus();
   const dark = theme === 'dark';
   return <div className="home-page"><div className="home-wrap">
     <header className="home-header"><a href="#/" className="brand" aria-label="Folio home">{mark}folio.</a>
-      <nav aria-label="Product navigation"><button onClick={()=>jump('discover')}>Stock library</button><button onClick={()=>jump('walkthrough')}>Try a holding</button></nav>
+      <nav aria-label="Product navigation"><a href="#/library" aria-current={libraryPage ? "page" : undefined}>Stock library</a>{libraryPage ? <a href="#/">Overview</a> : <button onClick={()=>jump('walkthrough')}>Try a holding</button>}</nav>
       <button className="home-theme" aria-label={dark?'Switch to light mode':'Switch to dark mode'} title={dark?'Switch to light mode':'Switch to dark mode'} onClick={()=>setTheme(dark?'light':'dark')}>{dark?<Sun size={19}/>:<Moon size={19}/>}</button>
       <a className="home-signin" href="#/signin">Sign in <ArrowRight size={15}/></a></header>
-    <main><section className="home-hero"><div className="home-intro">
+    <main>{libraryPage ? <Discover full/> : <><section className="home-hero"><div className="home-intro">
       <h1>Know the stocks<br/><em>you own.</em></h1>
       <p>Follow stocks across the US, India and Canada. Track your trades, compare returns in six currencies and see where your portfolio is concentrated.</p>
-      <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><button onClick={()=>jump('discover')}>Explore stocks ↓</button></div>
-    </div><MarketPreview/></section><Discover/><TradeExample/>
+      <div className="hero-actions"><a className="home-cta" href="#/signup">Create an account <ArrowRight size={17}/></a><a className="explore-link" href="#/library">Explore stocks →</a></div>
+    </div><MarketPreview/></section><Discover/><TradeExample/></>}
     </main></div></div>;
 }
