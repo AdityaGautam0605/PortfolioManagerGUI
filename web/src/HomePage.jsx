@@ -115,22 +115,24 @@ function ProductOverview() {
   return <section className="product-overview" aria-labelledby="overview-title">
     <h2 id="overview-title" className="gradient-heading"><span>What can Folio</span> <span>tell you?</span></h2>
     <div className="overview-insights" data-motion-group>
-      <article data-motion-part><div><h3>Which holdings drive my returns?</h3>
-        <p>The biggest percentage gain can come from a small holding. To see which stock moved your balance most, look at how much you had invested when its price changed.</p>
-        <p>Here, a 5% gain on $1,000 earns $50. The smaller holding rises twice as fast and earns $20. Together they gain $70 on $1,200 invested, a portfolio return of about 5.8%.</p></div>
-        <dl className="return-example"><div><dt>$1,000 × 5%</dt><dd>+$50</dd></div><div><dt>$200 × 10%</dt><dd>+$20</dd></div></dl>
+      <article data-motion-part>
+        <div><h3>Return contribution</h3><strong className="insight-value gain">+$70</strong></div>
+        <dl className="return-example">
+          <div><dt>$1,000 × 5%</dt><dd>+$50</dd></div>
+          <div><dt>$200 × 10%</dt><dd>+$20</dd></div>
+        </dl>
       </article>
-      <article data-motion-part><div><h3>How much depends on one stock?</h3>
-        <p>A holding’s weight is its share of your portfolio’s current value. That weight can grow as its price rises, even if you never buy another share.</p>
-        <p>Use the slider to change one stock’s weight. If its price falls 10% and your other holdings stay flat, a stock with a 20% weight pulls the portfolio down 2%. At a 50% weight, the same fall costs the portfolio 5%.</p></div>
-        <div className="insight-control"><label htmlFor="sample-weight">Position weight <b>{weight}%</b></label><input id="sample-weight" type="range" min="1" max="100" value={weight} onChange={e=>setWeight(Number(e.target.value))}/>
-        <div>Portfolio change <output htmlFor="sample-weight">−{(weight/10).toFixed(1)}%</output></div></div>
+      <article data-motion-part>
+        <div><h3>Portfolio impact</h3><output className="insight-value loss" htmlFor="sample-weight">−{(weight/10).toFixed(1)}%</output>
+          <small className="insight-assumption">Single-stock shock · −10%</small></div>
+        <div className="insight-control"><label htmlFor="sample-weight">Position weight <b>{weight}%</b></label>
+          <input id="sample-weight" type="range" min="1" max="100" value={weight} onChange={e=>setWeight(Number(e.target.value))}/></div>
       </article>
-      <article data-motion-part><div><h3>How does time affect my returns?</h3>
-        <p>Start with $1,000 and assume it earns 5% each year. In year one, that adds $50. Reinvesting the gain brings the balance to $1,050, so the second year adds $52.50.</p>
-        <p>Move the time horizon to see compounding at work. This example holds the annual rate steady and assumes no additional deposits or withdrawals. Actual stock returns vary from year to year.</p></div>
-        <div className="insight-control"><label htmlFor="sample-years">Time horizon <b>{years} {years===1?'year':'years'}</b></label><input id="sample-years" type="range" min="1" max="10" value={years} onChange={e=>setYears(Number(e.target.value))}/>
-        <div>Projected value <output htmlFor="sample-years">{(1000*1.05**years).toLocaleString('en-US',{style:'currency',currency:'USD'})}</output></div></div>
+      <article data-motion-part>
+        <div><h3>Projected value</h3><output className="insight-value" htmlFor="sample-years">{(1000*1.05**years).toLocaleString('en-US',{style:'currency',currency:'USD'})}</output>
+          <small className="insight-assumption">$1,000 initial · 5% annually</small></div>
+        <div className="insight-control"><label htmlFor="sample-years">Time horizon <b>{years} {years===1?'year':'years'}</b></label>
+          <input id="sample-years" type="range" min="1" max="10" value={years} onChange={e=>setYears(Number(e.target.value))}/></div>
       </article>
     </div>
   </section>;

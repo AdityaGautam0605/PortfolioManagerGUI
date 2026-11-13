@@ -96,7 +96,11 @@
 .product-overview { padding:32px 0; }
 .overview-insights { display:grid; grid-template-columns:minmax(0,1fr); gap:clamp(16px,2vw,32px); margin-top:20px; }
 .overview-insights h3 { font-size:18px; line-height:1.35; }
-.overview-insights p { max-width:68ch; margin:10px 0 0; color:var(--dim); line-height:1.6; }
+.home-page .product-overview h2 { font-size:clamp(44px,6vw,96px); font-weight:500; letter-spacing:-.06em; line-height:1; }
+.insight-value { display:block; margin:4px 0; font-size:clamp(32px,3.6vw,60px); font-weight:500; letter-spacing:-.05em; line-height:1.1; font-variant-numeric:tabular-nums; }
+.insight-value.gain { color:var(--gain); }
+.insight-value.loss { color:var(--loss); }
+.insight-assumption { color:var(--dim); }
 .trade-example { row-gap:14px; }
 .trade-example .holding-explanation { grid-column:2; max-width:65ch; margin:0; font-size:14px; }
 @media(max-width:740px) {
@@ -131,12 +135,12 @@
 
 .overview-insights article { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); gap:clamp(24px,5vw,88px); align-items:center; background:var(--panel); border-radius:12px; padding:clamp(18px,3vw,42px); }
 
-.overview-insights h3 { font-size:clamp(20px,2vw,30px); letter-spacing:-.04em; }
+.overview-insights h3 { font-size:16px; font-weight:500; color:var(--dim); }
 @media(max-width:740px) { .overview-insights article { grid-template-columns:minmax(0,1fr); gap:16px; } }
 .return-example,.insight-control { margin:0; font-variant-numeric:tabular-nums; }
-.return-example div,.insight-control label,.insight-control div { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; }
+.return-example div,.insight-control label { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; }
 .return-example dd { color:var(--gain); margin:0; }
-.insight-control div { border-top:1px solid var(--line); margin-top:5px; }
+
 
 @media (prefers-reduced-motion:no-preference) {
   .home-page :is(button,a,select),.company-search,.home-page input[type=range] {
