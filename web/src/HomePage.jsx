@@ -116,7 +116,8 @@ function ProductOverview() {
     <h2 id="overview-title" className="gradient-heading"><span>What can Folio</span> <span>tell you?</span></h2>
     <div className="overview-insights" data-motion-group>
       <article data-motion-part>
-        <div><h3>Return contribution</h3><strong className="insight-value gain">+$70</strong></div>
+        <div><h3>Return contribution</h3><strong className="insight-value gain">+$70</strong>
+          <small className="insight-assumption">The larger position accounts for $50 of the total gain.</small></div>
         <dl className="return-example">
           <div><dt>$1,000 × 5%</dt><dd>+$50</dd></div>
           <div><dt>$200 × 10%</dt><dd>+$20</dd></div>
@@ -124,13 +125,13 @@ function ProductOverview() {
       </article>
       <article data-motion-part>
         <div><h3>Portfolio impact</h3><output className="insight-value loss" htmlFor="sample-weight">−{(weight/10).toFixed(1)}%</output>
-          <small className="insight-assumption">Single-stock shock · −10%</small></div>
+          <small className="insight-assumption">One stock falls 10%. All other holdings stay flat.</small></div>
         <div className="insight-control"><label htmlFor="sample-weight">Position weight <b>{weight}%</b></label>
           <input id="sample-weight" type="range" min="1" max="100" value={weight} onChange={e=>setWeight(Number(e.target.value))}/></div>
       </article>
       <article data-motion-part>
         <div><h3>Projected value</h3><output className="insight-value" htmlFor="sample-years">{(1000*1.05**years).toLocaleString('en-US',{style:'currency',currency:'USD'})}</output>
-          <small className="insight-assumption">$1,000 initial · 5% annually</small></div>
+          <small className="insight-assumption">$1,000 invested at an assumed 5% annual return, with gains reinvested.</small></div>
         <div className="insight-control"><label htmlFor="sample-years">Time horizon <b>{years} {years===1?'year':'years'}</b></label>
           <input id="sample-years" type="range" min="1" max="10" value={years} onChange={e=>setYears(Number(e.target.value))}/></div>
       </article>

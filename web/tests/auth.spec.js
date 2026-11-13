@@ -192,3 +192,32 @@ test('sample stocks continue rotating after selecting a stock and inspecting a s
   await page.clock.fastForward(8000);
   await expect(stock('AAPL')).toHaveAttribute('aria-pressed', 'true');
 });
+test('sign-in preloads the workspace code and reuses it after authentication', async ({ page }) => {
+  let authenticated = false;
+  let privateSnapshots = 0;
+  let workspaceLoads = 0;
+  page.on('request', req => {
+    if (/\/Workspace(?:-[\w-]+\.js|\.jsx)(?:\?|$)/.test(req.url())) workspaceLoads++;
+  });
+  await page.route('**/api/snapshot', route => {
+    if (!authenticated) return route.fulfill({ status: 401, json: {} });
+    privateSnapshots++;
+    return route.fulfill({ json: snapshot });
+  });
+  await page.route('**/api/auth/options', route => route.fulfill({ json: {} }));
+  await page.route('**/api/auth/login', route => {
+    authenticated = true;
+    return route.fulfill({ json: { signedIn: true } });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('link', {name:'Sign in', exact:true})).toBeVisible();
+  expect(workspaceLoads).toBe(0);
+  await page.getByRole('link', {name:'Sign in', exact:true}).click();
+  await expect.poll(() => workspaceLoads).toBe(1);
+  await page.getByLabel('Email or username').fill('alice');
+  await page.getByLabel('Password', {exact:true}).fill('test-password');
+  await page.getByRole('button', {name:'Sign in', exact:true}).click();
+  await expect(page.getByLabel('Account: alice', {exact:true})).toBeVisible();
+  expect(workspaceLoads).toBe(1);
+  expect(privateSnapshots).toBe(1);
+});
