@@ -1094,6 +1094,11 @@ tbody tr:hover {
 .stock-card {
   padding: 24px;
 }
+.stock-card-sector { font-size: 14px; color: var(--muted); }
+.performance-summary { border-top: 1px solid var(--border-strong); margin-top: 16px; padding-top: 12px; }
+.performance-summary p { font-size: 14px; line-height: 1.6; margin: 8px 0; }
+.performance-summary small { color: var(--muted); display: block; margin-top: 10px; }
+.list-toolbar { flex-wrap: wrap; }
 .stock-card-title {
   padding: 0;
   background: transparent;

@@ -54,6 +54,10 @@ The `/api/health` endpoint checks that the Java process is reachable, not databa
 
 ## Existing holdings and operational limits
 
+For AI performance summaries, set `GEMINI_API_KEY` on the Java service to a Google AI Studio API key and redeploy. The default model is `gemini-3.1-flash-lite`; override it with `FOLIO_SUMMARY_MODEL` if needed. Use a free-tier project to stay within the project's free-hosting budget. The service sends only the ticker and public price statistics. Summaries use up to 22 available daily closes, cache successful generations by their input facts, and show measured performance when generation is unavailable. Demo mode always uses labeled sample data.
+
+Each device or browser profile has its own hosted session. Signing out ends that session. Sessions expire after 15 minutes without user input or at the existing 24-hour maximum lifetime. Tabs sharing a cookie share the idle timer. Background refreshes do not extend it. Sessions created before the idle-timeout migration require a fresh sign-in.
+
 For Folio's Firebase email/password accounts, enable Email/Password in the Firebase console and add the Vercel hostname under Authentication → Settings → Authorized domains. Render reads the public web API key from `FOLIO_FIREBASE_WEB_KEY` in the Blueprint. The Java backend calls the Firebase Authentication REST API. Verification and password reset emails open Firebase's hosted action page and offer a return link to Folio. Set the project's password policy to a minimum of 15 characters for provider-hosted resets. Existing Google and legacy password accounts retain their original sign-in methods. Firebase resets apply to Firebase-managed accounts. Already-issued Folio sessions expire separately.
 
 - Local data is not imported automatically. After creating your account, an explicit, reviewed import can copy your existing holdings into that account. Do not populate another account based on a browser-supplied owner ID.

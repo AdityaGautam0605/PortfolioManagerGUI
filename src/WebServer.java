@@ -24,6 +24,7 @@ public class WebServer {
     private final ExecutorService refreshWorker = Executors.newSingleThreadExecutor();
     private final HttpServer server;
     private final HistoryCache historyCache;
+    private final StockSummary stockSummary = new StockSummary();
     private volatile RefreshJob job;
 
     private static class RefreshJob {
@@ -88,6 +89,7 @@ public class WebServer {
                 send(exchange, 200, new JSONObject().put("mode", auth != null ? "hosted" : demo ? "demo" : "connected")); return;
             }
             HostedAuth.Account account = null;
+            JSONObject sessionInfo = null;
             if (auth != null) {
                 String token = HostedAuth.token(exchange.getRequestHeaders().getFirst("Cookie"));
                 if (method.equals("GET") && route.equals("/api/auth/options")) {
@@ -125,8 +127,16 @@ public class WebServer {
                     exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(null));
                     send(exchange, 200, new JSONObject().put("message", "Signed out.")); return;
                 }
-                account = auth.authenticate(token);
-                if (account == null) { send(exchange, 401, error("Sign in to access your portfolio.")); return; }
+                boolean activity = method.equals("POST") && route.equals("/api/session/activity");
+                if (activity) auth.recordActivity(token,readBody(exchange).optLong("elapsedMillis",0));
+                var session = auth.currentSession(token);
+                if (session == null) { send(exchange, 401, error("Sign in to access your portfolio.")); return; }
+                account = session.account();
+                if (activity || route.equals("/api/snapshot")) {
+                    sessionInfo = new JSONObject().put("id",HostedAuth.digest("browser-session:" + token))
+                            .put("remainingMs",Math.max(0,session.deadline()-System.currentTimeMillis()));
+                }
+                if (activity) { send(exchange,200,sessionInfo); return; }
             }
             String owner = account == null ? "local" : account.id();
             StockManager manager = account == null ? this.manager : new HostedStockManager(owner);
@@ -139,9 +149,10 @@ public class WebServer {
                         .put("name", item.getName()).put("price", item.getPrice()).put("holding", item.isHolding()));
                 JSONObject snapshot = new JSONObject().put("mode", auth != null ? "hosted" : demo ? "demo" : "connected")
                         .put("positions", positions).put("stocks", stocks).put("loadedAt", Instant.now().toString());
-                if (account != null) snapshot.put("account", new JSONObject().put("id", account.id()).put("username", account.username()));
+                if (account != null) snapshot.put("account", new JSONObject().put("id", account.id()).put("username", account.username())).put("session",sessionInfo);
                 send(exchange, 200, snapshot);
-            } else if (method.equals("GET") && route.equals("/api/history")) {
+            } else if ((method.equals("GET") && route.equals("/api/history")) ||
+                    (method.equals("POST") && route.equals("/api/summary"))) {
                 String symbol = symbol(query(exchange, "symbol"));
                 JSONArray points = new JSONArray();
                 var history = historyCache.get(symbol);
@@ -149,6 +160,9 @@ public class WebServer {
                     exchange.getResponseHeaders().set("Retry-After", "1");
                     send(exchange, 202, new JSONObject().put("symbol", symbol).put("pending", true).put("retryAfterMs", 750));
                     return;
+                }
+                if (route.equals("/api/summary")) {
+                    send(exchange,200,stockSummary.describe(symbol,history,demo)); return;
                 }
                 for (HistoricalDataPoint point : history.points()) points.put(new JSONObject().put("date", point.getDate()).put("price", point.getPrice()));
                 JSONObject response = new JSONObject().put("symbol", symbol).put("points", points)

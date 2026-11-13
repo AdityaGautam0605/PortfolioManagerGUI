@@ -11,12 +11,14 @@ import java.util.*;
 /** Small password/session service for the hosted app. Tokens are stored only as SHA-256 digests. */
 public final class HostedAuth {
     static final String COOKIE = "__Host-folio-session";
+    static final long IDLE_MILLIS = 15 * 60_000L;
     private static final int ITERATIONS = 600_000;
     private static final SecureRandom RANDOM = new SecureRandom();
     private final StockManager.ConnectionProvider connections;
     private final Deque<Long> attempts = new ArrayDeque<>();
     record Account(String id, String username) { }
     record Login(Account account, String token) { }
+    record Session(Account account, long deadline) { }
     HostedAuth() { this(DatabaseConnection::getConnection); }
     HostedAuth(StockManager.ConnectionProvider connections) { this.connections = connections; }
 
@@ -88,24 +90,39 @@ public final class HostedAuth {
     }
     static String newSalt() { return Base64.getEncoder().encodeToString(random(16)); }
     Login session(Connection conn, Account account) throws SQLException {
-        // Serializes simultaneous sign-ins and limits each account to one active session.
+        // Coordinate issuance with account-wide revocation during a password reset.
         try (var stmt = conn.prepareStatement("SELECT id FROM folio_accounts WHERE id = ? FOR UPDATE")) {
             stmt.setString(1, account.id()); try (var rs = stmt.executeQuery()) { if (!rs.next()) throw new SQLException("Missing account."); }
         }
-        try (var stmt = conn.prepareStatement("DELETE FROM folio_sessions WHERE owner_id = ? OR expires_at < ?")) {
-            stmt.setString(1, account.id()); stmt.setTimestamp(2, Timestamp.from(Instant.now())); stmt.executeUpdate();
+        Instant now = Instant.now();
+        try (var stmt = conn.prepareStatement("DELETE FROM folio_sessions WHERE idle_until IS NULL OR idle_until <= ? OR expires_at <= ?")) {
+            stmt.setTimestamp(1, Timestamp.from(now)); stmt.setTimestamp(2, Timestamp.from(now)); stmt.executeUpdate();
         }
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(random(32));
-        try (var stmt = conn.prepareStatement("INSERT INTO folio_sessions (token_hash, owner_id, expires_at) VALUES (?, ?, ?)")) {
-            stmt.setString(1, digest(token)); stmt.setString(2, account.id()); stmt.setTimestamp(3, Timestamp.from(Instant.now().plusSeconds(86400))); stmt.executeUpdate();
+        try (var stmt = conn.prepareStatement("INSERT INTO folio_sessions (token_hash, owner_id, expires_at, idle_until) VALUES (?, ?, ?, ?)")) {
+            stmt.setString(1, digest(token)); stmt.setString(2, account.id()); stmt.setTimestamp(3, Timestamp.from(now.plusSeconds(86400)));
+            stmt.setTimestamp(4, Timestamp.from(now.plusMillis(IDLE_MILLIS))); stmt.executeUpdate();
         }
         return new Login(account, token);
     }
     Account authenticate(String token) throws SQLException {
+        Session current = currentSession(token);
+        return current == null ? null : current.account();
+    }
+    Session currentSession(String token) throws SQLException {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) return null;
-        try (var conn = connections.open(); var stmt = conn.prepareStatement("SELECT a.id, a.username FROM folio_sessions s JOIN folio_accounts a ON a.id = s.owner_id WHERE s.token_hash = ? AND s.expires_at > ?")) {
-            stmt.setString(1, digest(token)); stmt.setTimestamp(2, Timestamp.from(Instant.now()));
-            try (var rs = stmt.executeQuery()) { return rs.next() ? new Account(rs.getString(1), rs.getString(2)) : null; }
+        try (var conn = connections.open(); var stmt = conn.prepareStatement("SELECT a.id, a.username, LEAST(s.idle_until,s.expires_at) FROM folio_sessions s JOIN folio_accounts a ON a.id = s.owner_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.idle_until > ?")) {
+            Timestamp now = Timestamp.from(Instant.now());
+            stmt.setString(1, digest(token)); stmt.setTimestamp(2, now); stmt.setTimestamp(3, now);
+            try (var rs = stmt.executeQuery()) { return rs.next() ? new Session(new Account(rs.getString(1), rs.getString(2)),rs.getTimestamp(3).getTime()) : null; }
+        }
+    }
+    void recordActivity(String token, long elapsedMillis) throws SQLException {
+        if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) return;
+        Instant now = Instant.now();
+        Timestamp deadline = Timestamp.from(now.plusMillis(IDLE_MILLIS - Math.clamp(elapsedMillis,0L,IDLE_MILLIS)));
+        try (var conn = connections.open(); var stmt = conn.prepareStatement("UPDATE folio_sessions SET idle_until=GREATEST(idle_until,?) WHERE token_hash=? AND idle_until>? AND expires_at>?")) {
+            stmt.setTimestamp(1,deadline); stmt.setString(2,digest(token)); stmt.setTimestamp(3,Timestamp.from(now)); stmt.setTimestamp(4,Timestamp.from(now)); stmt.executeUpdate();
         }
     }
     void logout(String token) throws SQLException {

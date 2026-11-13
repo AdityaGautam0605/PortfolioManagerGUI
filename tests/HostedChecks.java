@@ -57,6 +57,14 @@ public final class HostedChecks {
         HostedSchema.main(new String[0]);
         HostedSchema.main(new String[0]);
         var auth = new HostedAuth();
+        var summary = new StockSummary();
+        var daily = List.of(new HistoricalDataPoint("2026-01-05",100), new HistoricalDataPoint("2026-01-06",95));
+        var measured = summary.describe("ABC",new HistoryCache.Result(daily,0,true,false,null),true);
+        check(!measured.getBoolean("ai") && measured.getBoolean("stale") && measured.getString("text").contains("-5.00%"),"Measured summary reports date, freshness and loss");
+        try {
+            summary.describe("ABC",new HistoryCache.Result(daily.subList(0,1),0,false,false,null),true);
+            throw new AssertionError("Missing history should not generate a performance claim");
+        } catch (OperationException expected) { check(true,"Insufficient history rejected"); }
         checkFirebase(auth);
         var identity = new HostedIdentity(auth,"https://folio.example");
         String signupCode, resetCode, emailCode;
@@ -90,7 +98,15 @@ public final class HostedChecks {
         check(auth.login("nobody", "incorrect-password") == null, "Unknown account denied");
         var next = auth.login("alice", "a-strong-test-password");
         check(next != null && !next.token().equals(alice.token()), "Login rotates session");
-        check(auth.authenticate(alice.token()) == null, "Previous session invalidated");
+        check(auth.authenticate(alice.token()) != null, "Previous device stays signed in");
+        var previous = auth.currentSession(alice.token());
+        auth.recordActivity(next.token(),0);
+        check(auth.currentSession(alice.token()).deadline()==previous.deadline(),"Device activity is independent");
+        try (var conn = DatabaseConnection.getConnection(); var stmt = conn.prepareStatement("UPDATE folio_sessions SET idle_until='2000-01-01 00:00:00' WHERE token_hash=?")) {
+            stmt.setString(1,HostedAuth.digest(alice.token())); stmt.executeUpdate();
+        }
+        auth.recordActivity(alice.token(),0);
+        check(auth.authenticate(alice.token())==null && auth.authenticate(next.token())!=null,"Idle session cannot revive or expire another device");
         alice = next;
         check(HostedAuth.cookie(alice.token()).contains("HttpOnly; Secure; SameSite=Lax"), "Secure cookie flags");
         boolean duplicate = false;

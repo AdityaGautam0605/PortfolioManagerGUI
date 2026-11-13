@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS folio_sessions (
   expires_at TIMESTAMP NOT NULL,
   FOREIGN KEY (owner_id) REFERENCES folio_accounts(id) ON DELETE CASCADE
 );
+ALTER TABLE folio_sessions ADD COLUMN IF NOT EXISTS idle_until TIMESTAMP;
 CREATE TABLE IF NOT EXISTS folio_stocks (
   owner_id VARCHAR(36) NOT NULL,
   symbol VARCHAR(20) NOT NULL,

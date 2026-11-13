@@ -95,6 +95,25 @@ test('hosted registration, account identity, logout, and failed login', async ({
   await page.screenshot({ path: 'test-results/hosted-signin-mobile.png', fullPage: true });
 });
 
+test('idle workspace locks without a reload and input extends its deadline', async ({ page }) => {
+  await page.clock.install();
+  const duration = 15 * 60 * 1000;
+  const session = { id: 'test-session', remainingMs: duration };
+  await page.route('**/api/snapshot', route => route.fulfill({ json: { ...snapshot, session } }));
+  await page.route('**/api/session/activity', route => route.fulfill({ json: session }));
+  await page.route('**/api/auth/options', route => route.fulfill({ json: {} }));
+  await page.goto('/');
+  await expect(page.getByLabel('Account: alice', { exact: true })).toBeVisible();
+  await page.clock.fastForward(14 * 60 * 1000);
+  await page.keyboard.press('Shift');
+  await page.waitForFunction(() => localStorage.getItem('folio-session-test-session') !== null);
+  await page.clock.fastForward(14 * 60 * 1000);
+  await expect(page.getByLabel('Account: alice', { exact: true })).toBeVisible();
+  await page.clock.fastForward(61000);
+  await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible();
+  await expect(page.getByLabel('Account: alice', { exact: true })).toHaveCount(0);
+});
+
 test('session expiry unmounts private portfolio data', async ({ page }) => {
   let expired = false;
   await page.route('**/api/snapshot', route => route.fulfill(expired

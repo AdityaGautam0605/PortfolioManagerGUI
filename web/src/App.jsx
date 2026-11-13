@@ -33,7 +33,10 @@ import {
 } from 'lucide-react';
 import { announceAccountChange, go, money, percent, readStored, request, signedMoney, store, tone } from './api.js';
 import PriceChart from './PriceChart.jsx';
+import { stockLibrary } from './stockLibrary.js';
+import PerformanceSummary from './PerformanceSummary.jsx';
 import SignIn from './SignIn.jsx';
+import { trackSession } from './session.js';
 
 const icons = { AAPL: 'A', NVDA: 'N', MSFT: 'M', GOOGL: 'G', AMZN: 'a', TSLA: 'T', META: '∞' };
 function StockMark({ symbol, small = false }) {
@@ -237,6 +240,9 @@ function Workspace() {
   }, []);
   const [route, setRoute] = useState(location.hash.slice(1) || '/');
   const [data, setData] = useState(null);
+  useEffect(() => {
+    if (data?.session) return trackSession(data.session);
+  }, [data?.session]);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
@@ -249,6 +255,7 @@ function Workspace() {
     return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
   });
   const [query, setQuery] = useState('');
+  const [libraryFilter, setLibraryFilter] = useState('all');
   const [sort, setSort] = useState('value');
   const [chartSymbol, setChartSymbol] = useState('');
   const demo = data?.mode === 'demo';
@@ -259,7 +266,7 @@ function Workspace() {
       ? ['AAPL', 'NVDA', 'TSLA', 'META']
       : [];
   const positions = data?.positions || [];
-  const stocks = data?.stocks || [];
+  const stocks = stockLibrary(data?.stocks || [], watched, demo);
   const stockBySymbol = useMemo(
     () => Object.fromEntries(stocks.map((s) => [s.symbol, s])),
     [stocks],
@@ -276,7 +283,7 @@ function Workspace() {
   const worst = [...positions].sort((a, b) => a.returnPercent - b.returnPercent)[0];
   const currentSymbol = positions.some((p) => p.symbol === chartSymbol)
     ? chartSymbol
-    : positions[0]?.symbol || stocks[0]?.symbol;
+    : positions[0]?.symbol || data?.stocks?.[0]?.symbol;
   const detailSymbol = route.startsWith('/stock/') ? decodeURIComponent(route.slice(7)) : null;
   const pageTitle =
     route === '/'
@@ -410,9 +417,11 @@ function Workspace() {
   const openStock = (symbol) => go(`/stock/${encodeURIComponent(symbol)}`);
   const openTrade = (symbol, side = 'BUY') => setModal({ type: 'trade', symbol, side });
   const disabled = pending || loading;
-  const filteredStocks = stocks.filter((s) =>
-    `${s.symbol} ${s.name}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filteredStocks = stocks.filter((s) => {
+    const held = positions.some((p) => p.symbol === s.symbol);
+    return `${s.symbol} ${s.name} ${s.sector || ''}`.toLowerCase().includes(query.trim().toLowerCase())
+      && (route !== '/library' || libraryFilter === 'all' || (libraryFilter === 'held' ? held : !held));
+  });
   const nav = [
     { path: '/', label: 'Overview', icon: Home },
     { path: '/holdings', label: 'Holdings', icon: Wallet },
@@ -537,7 +546,7 @@ function Workspace() {
                 : route === '/holdings'
                   ? 'Every position. One clear picture.'
                   : route === '/library'
-                    ? 'Explore the stocks in your saved universe.'
+                    ? 'Find companies, follow stocks and explore their recent performance.'
                     : route === '/watchlist'
                       ? 'Keep your next move in sight.'
                       : detailSymbol
@@ -646,7 +655,7 @@ function Workspace() {
                       value={currentSymbol || ''}
                       onChange={(e) => setChartSymbol(e.target.value)}
                     >
-                      {(positions.length ? positions : stocks).map((p) => (
+                      {(positions.length ? positions : data.stocks).map((p) => (
                         <option key={p.symbol}>{p.symbol}</option>
                       ))}
                     </select>
@@ -939,14 +948,17 @@ function Workspace() {
                     <input
                       aria-label="Filter stocks"
                       value={query}
-                      placeholder="Search by company or symbol…"
+                      placeholder="Company, symbol or sector…"
                       onChange={(e) => setQuery(e.target.value)}
                     />
                   </div>
+                  {route === '/library' && <select aria-label="Filter by ownership" value={libraryFilter} onChange={e => setLibraryFilter(e.target.value)}>
+                    <option value="all">All stocks</option><option value="unheld">Outside my portfolio</option><option value="held">My holdings</option>
+                  </select>}
                   <span className="muted">
                     {route === '/watchlist'
                       ? `${watched.length} saved to this browser`
-                      : `${stocks.length} saved stocks`}
+                      : `${filteredStocks.length} stocks`}
                   </span>
                 </div>
                 <div className="stock-card-grid">
@@ -979,9 +991,9 @@ function Workspace() {
                             </h2>
                             <p>{stock.name}</p>
                           </button>
-                          <div className="stock-card-price">
-                            {money(stock.price)}
-                            <span>Saved quote</span>
+                          <div className={stock.price > 0 ? 'stock-card-price' : 'stock-card-sector'}>
+                            {stock.price > 0 ? money(stock.price) : stock.sector || 'Market data'}
+                            {stock.price > 0 && <span>Saved quote</span>}
                           </div>
                           <div className="stock-card-footer">
                             <span className={position ? tone(position.returnPercent) : 'muted'}>
@@ -993,6 +1005,7 @@ function Workspace() {
                               Details <ArrowRight size={14} />
                             </button>
                           </div>
+                          <PerformanceSummary symbol={stock.symbol} demo={demo} />
                         </article>
                       );
                     })}
@@ -1005,7 +1018,7 @@ function Workspace() {
                     title={
                       query
                         ? 'No matching stocks'
-                        : route === '/watchlist'
+                        : route === '/library' && libraryFilter !== 'all' ? 'No stocks match this filter' : route === '/watchlist'
                           ? 'A little room for possibility'
                           : 'Your library is empty'
                     }
@@ -1013,6 +1026,10 @@ function Workspace() {
                       route === '/watchlist' && !query ? (
                         <button className="button primary" onClick={() => go('/library')}>
                           Explore stock library
+                        </button>
+                      ) : route === '/library' && !demo && /^[A-Za-z][A-Za-z0-9.-]{0,9}$/.test(query.trim()) ? (
+                        <button className="button subtle" onClick={() => openStock(query.trim().toUpperCase())}>
+                          Look up ticker {query.trim().toUpperCase()}
                         </button>
                       ) : null
                     }
@@ -1264,6 +1281,7 @@ function StockDetail({
             </button>
           </div>
           <PriceChart symbol={symbol} demo={demo} />
+          <PerformanceSummary key={symbol} symbol={symbol} demo={demo} />
         </section>
         <section className="panel position-detail">
           <span className="eyebrow">Your position</span>
@@ -1276,7 +1294,7 @@ function StockDetail({
           {[
             ['Shares', position?.quantity || '—'],
             ['Average cost', position ? money(position.averageCost) : '—'],
-            ['Saved price', stock ? money(stock.price) : '—'],
+            ['Saved price', stock?.price > 0 ? money(stock.price) : '—'],
             ['Cost basis', position ? money(position.quantity * position.averageCost) : '—'],
           ].map(([name, value]) => (
             <div className="settings-fact" key={name}>
