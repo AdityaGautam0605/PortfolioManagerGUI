@@ -24,6 +24,13 @@ export default function App() {
   const hadSession = useRef(false);
   const [workspace, setWorkspace] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [slowConnection, setSlowConnection] = useState(false);
+  useEffect(() => {
+    setSlowConnection(false);
+    if (workspace || requiresSignIn || loadError) return;
+    const timer = setTimeout(() => setSlowConnection(true), 4000);
+    return () => clearTimeout(timer);
+  }, [workspace, requiresSignIn, loadError, accountVersion]);
   useEffect(() => {
     const onHash = () => setHash(location.hash);
     const listener = () => {
@@ -87,6 +94,7 @@ export default function App() {
   if (workspace) return <workspace.Dashboard initialSnapshot={workspace.snapshot} theme={theme} setTheme={setTheme} />;
   return <main className="auth-shell" aria-label="Opening Folio">
     <span className="brand"><Brand />folio.</span>
+    {slowConnection && !loadError && <p role="status">Connecting to Folio. The server may take a moment to wake up…</p>}
     {loadError && <section className="empty"><h2>Your portfolio is out of reach</h2>
       <p role="alert">{loadError}</p>
       <button className="button primary" onClick={() => setAccountVersion(value => value + 1)}>Try loading again</button>

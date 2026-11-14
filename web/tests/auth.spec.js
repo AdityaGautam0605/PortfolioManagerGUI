@@ -221,3 +221,33 @@ test('sign-in preloads the workspace code and reuses it after authentication', a
   expect(workspaceLoads).toBe(1);
   expect(privateSnapshots).toBe(1);
 });
+test('a gateway failure during startup retries and opens sign-in after recovery', async ({ page }) => {
+  let attempts = 0;
+  await page.route('**/api/snapshot', route => {
+    attempts++;
+    return route.fulfill(attempts < 3
+      ? { status: 502, contentType: 'text/html', body: '<h1>Bad gateway</h1>' }
+      : { status: 401, json: {} });
+  });
+  await page.route('**/api/auth/options', route => route.fulfill({ json: {} }));
+  await page.goto('/#/signin');
+  await expect(page.getByRole('status')).toContainText('Connecting to Folio');
+  await expect(page.getByRole('heading', { name: 'Welcome back.' })).toBeVisible({ timeout: 15000 });
+  expect(attempts).toBe(3);
+});
+
+test('failed sign-in writes are not automatically replayed', async ({ page }) => {
+  let attempts = 0;
+  await page.route('**/api/snapshot', route => route.fulfill({ status: 401, json: {} }));
+  await page.route('**/api/auth/options', route => route.fulfill({ json: {} }));
+  await page.route('**/api/auth/login', route => {
+    attempts++;
+    return route.fulfill({ status: 502, contentType: 'text/html', body: 'Bad gateway' });
+  });
+  await page.goto('/#/signin');
+  await page.getByLabel('Email or username').fill('alice');
+  await page.getByLabel('Password', { exact: true }).fill('test-password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('could not confirm');
+  expect(attempts).toBe(1);
+});

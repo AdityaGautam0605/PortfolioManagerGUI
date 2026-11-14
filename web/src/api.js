@@ -1,11 +1,32 @@
 export async function request(path, { method = 'GET', body, signal, timeoutMs = 60000 } = {}) {
   const timeout = AbortSignal.timeout(timeoutMs);
-  const response = await fetch(`/api${path}`, {
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const options = {
     method,
     headers: { 'Content-Type': 'application/json', 'X-Portfolio-Client': 'portfolio-web' },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
-  });
+    signal: requestSignal,
+  };
+  let response;
+  let gatewayFailure;
+  // A sleeping host can return a gateway error before the Java server is ready.
+  // Only reads are safe to repeat automatically.
+  const retryDelays = method === 'GET' ? [2000, 4000, 8000, 12000, 12000] : [];
+  for (let attempt = 0; ; attempt++) {
+    response = await fetch(`/api${path}`, options);
+    const jsonResponse = (response.headers.get('content-type') || '').toLowerCase().includes('application/json');
+    gatewayFailure = [502, 504].includes(response.status) || (response.status === 503 && !jsonResponse);
+    if (!gatewayFailure || attempt >= retryDelays.length) break;
+    await response.body?.cancel();
+    await waitForRetry(retryDelays[attempt], requestSignal);
+  }
+  if (gatewayFailure) {
+    const error = new Error(method === 'GET'
+      ? 'The server is temporarily unavailable. Please try again shortly.'
+      : 'The server could not confirm this request. Check its status before trying again.');
+    error.status = response.status;
+    throw error;
+  }
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.toLowerCase().includes('application/json')) {
     throw new Error(
@@ -30,6 +51,21 @@ export async function request(path, { method = 'GET', body, signal, timeoutMs = 
     throw error;
   }
   return data;
+}
+function waitForRetry(delay, signal) {
+  return new Promise((resolve, reject) => {
+    signal.throwIfAborted();
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', cancel);
+      resolve();
+    }, delay);
+    function cancel() {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', cancel);
+      reject(signal.reason);
+    }
+    signal.addEventListener('abort', cancel, { once: true });
+  });
 }
 export function readStored(key, fallback) {
   try {
