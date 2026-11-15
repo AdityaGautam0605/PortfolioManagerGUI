@@ -12,6 +12,7 @@ public final class StockSummary {
     private final HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(4)).build();
     private final Semaphore capacity = new Semaphore(2);
     private final Map<String,String> summaries = new LinkedHashMap<>();
+    private final ProviderBudget budget = new ProviderBudget("AI",5,100);
 
     public JSONObject describe(String symbol, HistoryCache.Result history, boolean demo) {
         var points = history.points();
@@ -64,6 +65,8 @@ public final class StockSummary {
         }
         if (!capacity.tryAcquire()) return result.put("fallback",true);
         try {
+            try { budget.acquire(); }
+            catch (RateLimitException limited) { return result.put("fallback",true).put("retryAfterSeconds",limited.retryAfter()); }
             String model = System.getenv().getOrDefault("FOLIO_SUMMARY_MODEL","gemini-3.1-flash-lite");
             String prompt = "Write two concise plain-text sentences for a stock tracker, using only these historical facts. "
                     + "Describe the change and closing range. Avoid forecasts, causes, advice, or invented facts. " + facts;

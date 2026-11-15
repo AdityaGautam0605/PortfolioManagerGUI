@@ -109,6 +109,28 @@ Follow [deploy/README.md](deploy/README.md) for Neon, Render, Vercel, Firebase, 
 
 The Docker build uses Maven to package the hosted Java server and its dependencies. `WebServer --hosted` binds to the hosting platform's port.
 
+### Session and request protections
+
+Vercel and the Java server send matching browser policies on pages, assets, and API responses: CSP, anti-framing, MIME-sniffing protection, restricted browser permissions, referrer controls, and cross-origin resource/opener policies. Hosted responses also enforce HTTPS through HSTS. CSP allows the app's own resources and Google's sign-in library; inline JavaScript and `eval` are blocked. Inline CSS remains allowed for chart styling and Google widgets. OAuth popups are supported via `same-origin-allow-popups`. Browser tests apply the production headers to the preview site and check authentication plus CSP enforcement; real Google consent still needs a post-deployment smoke test.
+
+- Firebase-backed Folio sessions revalidate with Firebase at most once per 60 seconds per active device. Completed password resets, disabled accounts, and revoked refresh credentials deny access at the next check. Merely requesting a reset email does not log users out. When a required check fails because Firebase is unavailable, access fails closed temporarily.
+- Firebase refresh credentials are held only in bounded server memory, never returned to the browser or stored in the portfolio database. Backend restarts require Firebase users to sign in again. Existing sessions created before this protection also require a new sign-in. Concurrent devices still have independent sessions and the 15-minute inactivity timeout remains enforced.
+- Firebase accounts use Firebase password recovery; optional Resend email-code authentication remains available for non-Firebase accounts. This prevents an alternate login from bypassing Firebase revocation.
+- Sign-in allows 10 attempts per account per minute (username/email aliases share the limit). Email delivery allows 3 requests per recipient per minute, independently of sign-in. A 300-request server-wide ceiling and four concurrent authentication operations protect backend capacity. Forwarded IP headers are not trusted as client identity.
+- Per-user limits apply to history/rates (120/minute, 2,000/day), AI analysis (5/minute, 30/day), refreshes (2/minute, 20/day), and trades (30/minute, 200/day). Throttled requests return HTTP 429 with `Retry-After`; normal portfolio reads and logout remain available.
+- Actual outbound provider calls have separate minute/day caps. Cached results do not consume those caps; AI falls back to measured statistics when its generation allowance is exhausted.
+
+These controls target the current single-backend deployment. Counters and provider-session checks are process-local; counters reset on restart. Before running multiple replicas, move budgets and encrypted provider-session credentials into a shared store. Provider-side quotas remain the final usage/billing boundary.
+
+| Provider | Default calls/minute | Default calls/day | Environment prefix |
+| --- | ---: | ---: | --- |
+| Alpha Vantage | 5 | 25 | `FOLIO_ALPHA` |
+| Twelve Data | 8 | 800 | `FOLIO_TWELVE` |
+| Finnhub quotes | 60 | 5,000 | `FOLIO_QUOTE` |
+| Gemini generation | 5 | 100 | `FOLIO_AI` |
+
+These are application safety defaults, not claims about your provider plan. Set `<PREFIX>_PER_MINUTE` and `<PREFIX>_PER_DAY` to positive integers in Render to match your allowance. Daily limits use a rolling-start 24-hour window, not the provider's calendar-day reset.
+
 `GET /api/health` verifies that Java is reachable. A successful authenticated snapshot also checks the account and database path.
 
 ## Verification

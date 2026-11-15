@@ -25,6 +25,8 @@ public class WebServer {
     private final HttpServer server;
     private final HistoryCache historyCache;
     private final StockSummary stockSummary = new StockSummary();
+    private final Semaphore authenticationWork = new Semaphore(4);
+    private final RequestBudget marketRequests = new RequestBudget();
     private volatile RefreshJob job;
 
     private static class RefreshJob {
@@ -69,6 +71,7 @@ public class WebServer {
     public int getPort() { return server.getAddress().getPort(); }
     public void stop() { server.stop(0); workers.shutdownNow(); refreshWorker.shutdownNow(); historyCache.close(); }
     private void api(HttpExchange exchange) throws IOException {
+        browserPolicies(exchange);
         try {
             String host = exchange.getRequestHeaders().getFirst("Host");
             if (auth == null && !Set.of("127.0.0.1:" + server.getAddress().getPort(), "localhost:" + server.getAddress().getPort()).contains(host == null ? "" : host)) {
@@ -97,12 +100,18 @@ public class WebServer {
                 }
                 if (method.equals("POST") && Set.of("/api/auth/login","/api/auth/register","/api/auth/send-code","/api/auth/verify","/api/auth/google",
                         "/api/auth/firebase-signup","/api/auth/firebase-reset","/api/auth/firebase-check").contains(route)) {
-                    if (!auth.allowAttempt()) {
-                        exchange.getResponseHeaders().set("Retry-After", "60");
-                        send(exchange, 429, error("Too many sign-in attempts. Please wait a minute.")); return;
-                    }
                     JSONObject body = readBody(exchange);
                     String action = route.substring("/api/auth/".length());
+                    long retry=auth.allowAttempt(action,body);
+                    if (retry>0) {
+                        exchange.getResponseHeaders().set("Retry-After", Long.toString(retry));
+                        send(exchange, 429, error("Too many sign-in attempts. Please wait a minute.")); return;
+                    }
+                    if (!authenticationWork.tryAcquire()) {
+                        exchange.getResponseHeaders().set("Retry-After","2");
+                        send(exchange,429,error("Sign-in is busy. Please try again shortly.")); return;
+                    }
+                    try {
                     if (action.equals("login") && identity.options().optBoolean("firebaseEnabled")) {
                         String address = identity.firebaseLoginEmail(body.optString("username"));
                         if (address != null) { action = "firebase-login"; body.put("email",address); }
@@ -121,6 +130,7 @@ public class WebServer {
                     if (login == null) { send(exchange, 401, error("Incorrect email, username, or password.")); return; }
                     exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(login.token()));
                     send(exchange, 200, new JSONObject().put("message", "Signed in.")); return;
+                    } finally { authenticationWork.release(); }
                 }
                 if (method.equals("POST") && route.equals("/api/auth/logout")) {
                     auth.logout(token);
@@ -128,9 +138,13 @@ public class WebServer {
                     send(exchange, 200, new JSONObject().put("message", "Signed out.")); return;
                 }
                 boolean activity = method.equals("POST") && route.equals("/api/session/activity");
-                if (activity) auth.recordActivity(token,readBody(exchange).optLong("elapsedMillis",0));
                 var session = auth.currentSession(token);
                 if (session == null) { send(exchange, 401, error("Sign in to access your portfolio.")); return; }
+                if (activity) {
+                    auth.recordActivity(token,readBody(exchange).optLong("elapsedMillis",0));
+                    session = auth.currentSession(token);
+                    if (session == null) { send(exchange,401,error("Sign in to access your portfolio.")); return; }
+                }
                 account = session.account();
                 if (activity || route.equals("/api/snapshot")) {
                     sessionInfo = new JSONObject().put("id",HostedAuth.digest("browser-session:" + token))
@@ -139,6 +153,20 @@ public class WebServer {
                 if (activity) { send(exchange,200,sessionInfo); return; }
             }
             String owner = account == null ? "local" : account.id();
+            String budgetGroup = switch (route) {
+                case "/api/history", "/api/exchange-rates" -> "market";
+                case "/api/summary", "/api/portfolio-analysis" -> "analysis";
+                case "/api/refresh" -> "refresh";
+                case "/api/trades" -> "trade";
+                default -> null;
+            };
+            if (budgetGroup != null) {
+                int minute=switch (budgetGroup) { case "analysis" -> 5; case "refresh" -> 2; case "trade" -> 30; default -> 120; };
+                int day=switch (budgetGroup) { case "analysis" -> 30; case "refresh" -> 20; case "trade" -> 200; default -> 2000; };
+                long retry=marketRequests.acquire(new RequestBudget.Limit(owner+":"+budgetGroup+":minute",minute,60_000),
+                        new RequestBudget.Limit(owner+":"+budgetGroup+":day",day,86_400_000));
+                if (retry>0) throw new RateLimitException("Your request limit was reached. Please wait before trying again.",retry);
+            }
             StockManager manager = account == null ? this.manager : new HostedStockManager(owner);
             if (method.equals("GET") && route.equals("/api/snapshot")) {
                 JSONArray positions = new JSONArray(), stocks = new JSONArray();
@@ -223,6 +251,9 @@ public class WebServer {
                     }
                 } finally { writing.set(false); }
             } else send(exchange, 404, error("Endpoint not found."));
+        } catch (RateLimitException e) {
+            exchange.getResponseHeaders().set("Retry-After",Long.toString(e.retryAfter()));
+            send(exchange,429,error(e.getMessage()).put("retryAfterSeconds",e.retryAfter()));
         } catch (IllegalArgumentException | JSONException e) {
             send(exchange, 400, error(e instanceof JSONException ? "Invalid request body." : e.getMessage()));
         } catch (Exception e) { send(exchange, 503, error(explain(e))); }
@@ -262,6 +293,7 @@ public class WebServer {
         exchange.getResponseBody().write(bytes);
     }
     private void staticFile(HttpExchange exchange) throws IOException {
+        browserPolicies(exchange);
         try {
             if (!exchange.getRequestMethod().equals("GET")) { exchange.sendResponseHeaders(405, -1); return; }
             String requestPath = exchange.getRequestURI().getPath();
@@ -277,6 +309,18 @@ public class WebServer {
             exchange.sendResponseHeaders(200, Files.size(file));
             Files.copy(file, exchange.getResponseBody());
         } finally { exchange.close(); }
+    }
+    private void browserPolicies(HttpExchange exchange) {
+        var headers=exchange.getResponseHeaders();
+        headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; connect-src 'self' https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; img-src 'self' data:; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'");
+        headers.set("X-Frame-Options","DENY");
+        headers.set("X-Content-Type-Options","nosniff");
+        headers.set("Referrer-Policy","strict-origin-when-cross-origin");
+        headers.set("Permissions-Policy","camera=(), microphone=(), geolocation=(), payment=(), usb=()");
+        // Google OAuth uses a popup and needs to retain its opener relationship.
+        headers.set("Cross-Origin-Opener-Policy","same-origin-allow-popups");
+        headers.set("Cross-Origin-Resource-Policy","same-origin");
+        if (publicOrigin != null) headers.set("Strict-Transport-Security","max-age=63072000; includeSubDomains");
     }
     public static void main(String[] args) throws Exception {
         List<String> options = Arrays.asList(args);

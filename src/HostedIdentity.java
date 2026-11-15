@@ -16,9 +16,56 @@ final class HostedIdentity {
     private final HostedAuth auth;
     private final String origin;
     private final java.util.function.BiFunction<String,JSONObject,JSONObject> firebase;
+    private final java.util.function.LongSupplier clock;
+    private final Map<String, Grant> grants = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final class Grant {
+        final String uid;
+        final long expires;
+        String refresh;
+        long checked;
+        Grant(String uid, String refresh, long expires, long checked) {
+            this.uid=uid; this.refresh=refresh; this.expires=expires; this.checked=checked;
+        }
+    }
     HostedIdentity(HostedAuth auth, String origin) { this(auth, origin, HostedIdentity::firebaseRequest); }
     HostedIdentity(HostedAuth auth, String origin, java.util.function.BiFunction<String,JSONObject,JSONObject> firebase) {
+        this(auth, origin, firebase, System::currentTimeMillis);
+    }
+    HostedIdentity(HostedAuth auth, String origin, java.util.function.BiFunction<String,JSONObject,JSONObject> firebase, java.util.function.LongSupplier clock) {
         this.auth = auth; this.origin = origin; this.firebase = firebase;
+        this.clock = clock;
+        auth.providerSessions(this::checkSession, token -> grants.remove(HostedAuth.digest(token)));
+    }
+
+    // Provider credentials stay in memory. A restart deliberately requires a fresh sign-in.
+    private synchronized void remember(String token, Grant grant) {
+        grants.entrySet().removeIf(entry -> entry.getValue().expires <= clock.getAsLong());
+        if (grants.size() >= 10_000) throw new OperationException("Sign-in is busy. Please try again later.");
+        grants.put(HostedAuth.digest(token), grant);
+    }
+    private boolean checkSession(String token, String uid) {
+        Grant grant = grants.get(HostedAuth.digest(token));
+        return grant != null && grant.uid.equals(uid) && validate(grant, false);
+    }
+    private boolean validate(Grant grant, boolean force) {
+        synchronized (grant) {
+            long now = clock.getAsLong();
+            if (grant.expires <= now || grant.refresh == null) return false;
+            if (!force && now - grant.checked < 60_000) return true;
+            JSONObject refreshed = firebase.apply("refresh",new JSONObject().put("refreshToken",grant.refresh));
+            if (refreshed.optBoolean("revoked") || !grant.uid.equals(refreshed.optString("user_id"))) {
+                grant.refresh = null; return false;
+            }
+            String next = refreshed.optString("refresh_token");
+            if (next.isBlank()) throw new OperationException("The sign-in provider could not confirm your session. Please try again.");
+            grant.refresh=next; grant.checked=now; return true;
+        }
+    }
+    private HostedAuth.Login firebaseSession(Connection conn, HostedAuth.Account account, Grant grant) throws SQLException {
+        if (!validate(grant,true)) throw new IllegalArgumentException("Your sign-in expired. Please sign in again.");
+        var login=auth.session(conn,account);
+        remember(login.token(),new Grant(grant.uid,grant.refresh,clock.getAsLong()+86_400_000,clock.getAsLong()));
+        return login;
     }
 
     private static String env(String key) { return System.getenv().getOrDefault(key, "").strip(); }
@@ -130,6 +177,17 @@ final class HostedIdentity {
     private static JSONObject firebaseRequest(String method, JSONObject body) {
         String key = env("FOLIO_FIREBASE_WEB_KEY");
         if (key.isEmpty()) throw new OperationException("Firebase email sign-in is unavailable.");
+        if (method.equals("refresh")) {
+            var response = send(HttpRequest.newBuilder(URI.create("https://securetoken.googleapis.com/v1/token?key=" + encode(key)))
+                    .header("Content-Type","application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString("grant_type=refresh_token&refresh_token="+encode(body.getString("refreshToken")))));
+            if (response.statusCode()/100 == 2) return new JSONObject(response.body());
+            var detail = new JSONObject(response.body()).optJSONObject("error");
+            String reason = detail == null ? "" : detail.optString("message");
+            if (Set.of("TOKEN_EXPIRED","USER_DISABLED","USER_NOT_FOUND","INVALID_REFRESH_TOKEN").contains(reason))
+                return new JSONObject().put("revoked",true);
+            throw new OperationException("The sign-in provider could not confirm your session. Please try again.");
+        }
         var response = send(HttpRequest.newBuilder(URI.create("https://identitytoolkit.googleapis.com/v1/accounts:" + method + "?key=" + encode(key)))
                 .header("Content-Type","application/json").POST(HttpRequest.BodyPublishers.ofString(body.toString())));
         if (response.statusCode()/100 == 2) return new JSONObject(response.body());
@@ -181,6 +239,7 @@ final class HostedIdentity {
             if (sendLink) firebase.apply("sendOobCode",new JSONObject(token.toString()).put("requestType","VERIFY_EMAIL").put("continueUrl",origin));
             return new Result(new JSONObject().put("awaitingVerification",true).put("linkSent",sendLink).put("email",address),null);
         }
+        Grant grant = new Grant(uid,tokens.getString("refreshToken"),clock.getAsLong()+600_000,clock.getAsLong());
         try (var conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);
             try {
@@ -191,9 +250,11 @@ final class HostedIdentity {
                         if (rs.next()) {
                             if (!uid.equals(rs.getString("firebase_uid"))) throw new IllegalArgumentException("Use the original sign-in method for this account.");
                             var account = new HostedAuth.Account(rs.getString("id"),rs.getString("username"));
-                            result = new Result(new JSONObject().put("signedIn",true),auth.session(conn,account));
+                            result = new Result(new JSONObject().put("signedIn",true),firebaseSession(conn,account,grant));
                         } else {
-                            result = new Result(new JSONObject().put("ticket",issue(conn,address,"firebase-enroll",uid))
+                            String ticket = issue(conn,address,"firebase-enroll",uid);
+                            remember(ticket,grant);
+                            result = new Result(new JSONObject().put("ticket",ticket)
                                     .put("firebase",true).put("email",address),null);
                         }
                     }
@@ -230,10 +291,12 @@ final class HostedIdentity {
     private Result verified(Connection conn,String purpose,Proof proof,JSONObject body) throws SQLException {
         boolean google = purpose.equals("google");
         String lookup = google ? "google_sub" : "email";
-        try (var find = conn.prepareStatement("SELECT id,username FROM folio_accounts WHERE " + lookup + "=? FOR UPDATE")) {
+        try (var find = conn.prepareStatement("SELECT id,username,firebase_uid FROM folio_accounts WHERE " + lookup + "=? FOR UPDATE")) {
             find.setString(1,google ? proof.subject() : proof.email());
             try (var rs = find.executeQuery()) {
                 if (rs.next()) {
+                    if (rs.getString("firebase_uid") != null)
+                        throw new IllegalArgumentException("Use your Firebase password to sign in, or its forgot-password option to recover access.");
                     var account = new HostedAuth.Account(rs.getString(1),rs.getString(2));
                     if (purpose.equals("signup")) throw new IllegalArgumentException("This email already has an account. Sign in instead.");
                     if (purpose.equals("reset")) {
@@ -272,6 +335,13 @@ final class HostedIdentity {
             insert.setString(5,name(body,"firstName",regular || firebaseAccount)); insert.setString(6,name(body,"middleName",false)); insert.setString(7,name(body,"lastName",regular || firebaseAccount));
             insert.setString(8,salt); insert.setString(9,HostedAuth.passwordHash(password,salt)); insert.setString(10,firebaseAccount ? proof.subject() : null); insert.executeUpdate();
         }
-        return new Result(new JSONObject().put("signedIn",true),auth.session(conn,account));
+        HostedAuth.Login login;
+        if (firebaseAccount) {
+            Grant grant = grants.get(HostedAuth.digest(body.optString("ticket")));
+            if (grant == null || !grant.uid.equals(proof.subject())) throw new IllegalArgumentException("Your signup expired. Please start again.");
+            login = firebaseSession(conn,account,grant);
+            grants.remove(HostedAuth.digest(body.optString("ticket")));
+        } else login = auth.session(conn,account);
+        return new Result(new JSONObject().put("signedIn",true),login);
     }
 }

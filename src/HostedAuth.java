@@ -15,19 +15,34 @@ public final class HostedAuth {
     private static final int ITERATIONS = 600_000;
     private static final SecureRandom RANDOM = new SecureRandom();
     private final StockManager.ConnectionProvider connections;
-    private final Deque<Long> attempts = new ArrayDeque<>();
+    private final portfolioManagerGUI.RequestBudget attempts = new portfolioManagerGUI.RequestBudget();
+    private java.util.function.BiPredicate<String,String> providerCheck = (token, uid) -> false;
+    private java.util.function.Consumer<String> providerLogout = token -> {};
+    void providerSessions(java.util.function.BiPredicate<String,String> check, java.util.function.Consumer<String> logout) {
+        providerCheck = check; providerLogout = logout;
+    }
     record Account(String id, String username) { }
     record Login(Account account, String token) { }
     record Session(Account account, long deadline) { }
     HostedAuth() { this(DatabaseConnection::getConnection); }
     HostedAuth(StockManager.ConnectionProvider connections) { this.connections = connections; }
 
-    // A global, bounded budget avoids trusting spoofable forwarded IPs behind multiple proxies.
-    synchronized boolean allowAttempt() {
-        long now = System.currentTimeMillis();
-        while (!attempts.isEmpty() && attempts.peekFirst() < now - 60_000) attempts.removeFirst();
-        if (attempts.size() >= 20) return false;
-        attempts.addLast(now); return true;
+    long allowAttempt(String action, org.json.JSONObject body) throws SQLException {
+        String identifier=(action.equals("login") ? body.optString("username") :
+                action.equals("register") || action.equals("google") || action.equals("verify") ? "" : body.optString("email"))
+                .strip().toLowerCase(Locale.ROOT);
+        // Username and email aliases for an existing account share the same budget.
+        if (!identifier.isBlank()) {
+            try (var conn=connections.open(); var stmt=conn.prepareStatement("SELECT id FROM folio_accounts WHERE username=? OR email=?")) {
+                stmt.setString(1,identifier); stmt.setString(2,identifier);
+                try (var rs=stmt.executeQuery()) { if (rs.next()) identifier=rs.getString(1); }
+            }
+        } else identifier=action.equals("register") ? body.optString("ticket","anonymous") : body.optString("code","anonymous");
+        String group=action.equals("firebase-reset") || action.equals("send-code") ? "delivery" : "signin";
+        int maximum=group.equals("delivery") ? 3 : 10;
+        return attempts.acquire(
+                new portfolioManagerGUI.RequestBudget.Limit(group+":"+digest(identifier),maximum,60_000),
+                new portfolioManagerGUI.RequestBudget.Limit("server",300,60_000));
     }
     static String username(String value) {
         String name = value.strip().toLowerCase(Locale.ROOT);
@@ -111,11 +126,19 @@ public final class HostedAuth {
     }
     Session currentSession(String token) throws SQLException {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) return null;
-        try (var conn = connections.open(); var stmt = conn.prepareStatement("SELECT a.id, a.username, LEAST(s.idle_until,s.expires_at) FROM folio_sessions s JOIN folio_accounts a ON a.id = s.owner_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.idle_until > ?")) {
+        Session session;
+        String firebaseUid;
+        try (var conn = connections.open(); var stmt = conn.prepareStatement("SELECT a.id, a.username, LEAST(s.idle_until,s.expires_at), a.firebase_uid FROM folio_sessions s JOIN folio_accounts a ON a.id = s.owner_id WHERE s.token_hash = ? AND s.expires_at > ? AND s.idle_until > ?")) {
             Timestamp now = Timestamp.from(Instant.now());
             stmt.setString(1, digest(token)); stmt.setTimestamp(2, now); stmt.setTimestamp(3, now);
-            try (var rs = stmt.executeQuery()) { return rs.next() ? new Session(new Account(rs.getString(1), rs.getString(2)),rs.getTimestamp(3).getTime()) : null; }
+            try (var rs = stmt.executeQuery()) {
+                if (!rs.next()) { providerLogout.accept(token); return null; }
+                session = new Session(new Account(rs.getString(1), rs.getString(2)),rs.getTimestamp(3).getTime());
+                firebaseUid = rs.getString(4);
+            }
         }
+        if (firebaseUid != null && !providerCheck.test(token, firebaseUid)) { logout(token); return null; }
+        return session.deadline() > System.currentTimeMillis() ? session : null;
     }
     void recordActivity(String token, long elapsedMillis) throws SQLException {
         if (token == null || !token.matches("[A-Za-z0-9_-]{43}")) return;
@@ -127,6 +150,7 @@ public final class HostedAuth {
     }
     void logout(String token) throws SQLException {
         if (token == null) return;
+        providerLogout.accept(token);
         try (var conn = connections.open(); var stmt = conn.prepareStatement("DELETE FROM folio_sessions WHERE token_hash = ?")) {
             stmt.setString(1, digest(token)); stmt.executeUpdate();
         }

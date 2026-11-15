@@ -26,12 +26,21 @@ public final class HostedChecks {
         String email = "firebase@example.com";
         var profile = new JSONObject().put("email",email).put("localId","firebase-owner").put("emailVerified",false);
         var mail = new ArrayList<String>();
+        var now = new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
+        var revoked = new java.util.concurrent.atomic.AtomicBoolean();
+        var unavailable = new java.util.concurrent.atomic.AtomicBoolean();
+        var refreshes = new java.util.concurrent.atomic.AtomicInteger();
         var identity = new HostedIdentity(auth,"https://folio.example",(method,body) -> switch (method) {
             case "lookup" -> new JSONObject().put("users",new JSONArray().put(profile));
-            case "signUp","signInWithPassword" -> new JSONObject().put("localId",profile.getString("localId")).put("idToken","test");
+            case "signUp","signInWithPassword" -> new JSONObject().put("localId",profile.getString("localId")).put("idToken","test").put("refreshToken","test-refresh");
+            case "refresh" -> {
+                refreshes.incrementAndGet();
+                if (unavailable.get()) throw new OperationException("Provider unavailable");
+                yield revoked.get() ? new JSONObject().put("revoked",true) : new JSONObject().put("user_id",profile.getString("localId")).put("refresh_token","rotated-refresh");
+            }
             case "sendOobCode" -> { mail.add(body.getString("requestType")); yield new JSONObject(); }
             default -> throw new AssertionError(method);
-        });
+        },now::get);
         var input = new JSONObject().put("email",email).put("password","testing the email flow");
         var pending = identity.firebaseFlow("firebase-signup",input);
         check(pending.login()==null && pending.json().getBoolean("awaitingVerification"),"Unverified user cannot get a session");
@@ -42,7 +51,36 @@ public final class HostedChecks {
         var registration = new JSONObject().put("firebase",true).put("ticket",ticket).put("username","firebase_user").put("firstName","Faye").put("lastName","Lee");
         var created = identity.handle("register",registration).login();
         check(identity.firebaseLoginEmail("firebase_user").equals(email),"Username resolves to Firebase email");
-        check(identity.firebaseFlow("firebase-login",input).login().account().equals(created.account()),"Firebase login retains portfolio owner");
+        var second = identity.firebaseFlow("firebase-login",input).login();
+        check(second.account().equals(created.account()),"Firebase login retains portfolio owner");
+        check(auth.authenticate(created.token())!=null && auth.authenticate(second.token())!=null,"Independent Firebase sessions remain valid");
+        int before = refreshes.get();
+        auth.authenticate(created.token());
+        check(refreshes.get()==before,"Firebase checks are cached for at most one minute");
+        identity.firebaseFlow("firebase-reset",input);
+        check(auth.authenticate(created.token())!=null,"Requesting a reset alone does not log out the user");
+        now.addAndGet(60_001);
+        unavailable.set(true);
+        boolean failedClosed=false;
+        try { auth.authenticate(created.token()); } catch (OperationException expected) { failedClosed=true; }
+        check(failedClosed,"Provider outage cannot bypass revocation check");
+        unavailable.set(false);
+        check(auth.authenticate(created.token())!=null,"Transient provider failure does not delete a valid session");
+        revoked.set(true); now.addAndGet(60_001);
+        check(auth.authenticate(created.token())==null && auth.authenticate(second.token())==null,"Provider revocation invalidates every device session");
+        revoked.set(false);
+        var renewed=identity.firebaseFlow("firebase-login",input).login();
+        check(auth.authenticate(renewed.token())!=null,"Fresh authentication succeeds after password reset");
+        auth.logout(renewed.token());
+        check(auth.authenticate(renewed.token())==null,"Firebase logout removes session access");
+        var restarted=identity.firebaseFlow("firebase-login",input).login();
+        check(new HostedAuth().authenticate(restarted.token())==null,"Old Firebase sessions fail closed after server restart");
+        String bypass;
+        try (var conn=DatabaseConnection.getConnection()) { bypass=HostedIdentity.issue(conn,email,"email",null); }
+        boolean alternateDenied=false;
+        try { identity.handle("verify",new JSONObject().put("purpose","email").put("code",bypass)); }
+        catch (IllegalArgumentException expected) { alternateDenied=true; }
+        check(alternateDenied,"Email-code flow cannot create an unmonitored Firebase session");
         profile.put("localId","different-owner");
         boolean collision = false;
         try { identity.firebaseFlow("firebase-login",input); } catch (IllegalArgumentException expected) { collision = true; }
@@ -157,6 +195,14 @@ public final class HostedChecks {
         server.start();
         int port = server.getPort();
         try {
+            var policies=new JSONObject(Files.readString(Path.of("vercel.json"))).getJSONArray("headers").getJSONObject(0).getJSONArray("headers");
+            for (String path : List.of("/", "/missing-file", "/api/health", "/api/snapshot")) {
+                var response=HttpClient.newHttpClient().send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+path)).GET().build(),HttpResponse.BodyHandlers.ofString());
+                for (int i=0;i<policies.length();i++) {
+                    var policy=policies.getJSONObject(i);
+                    check(response.headers().firstValue(policy.getString("key")).orElse("").equals(policy.getString("value")),"Browser policy matches Vercel on "+path+": "+policy.getString("key"));
+                }
+            }
             check(request(port, "/health", "GET", null, null, null).statusCode() == 200, "Public health works");
             for (String path : List.of("/snapshot", "/history?symbol=AAPL", "/jobs/unknown"))
                 check(request(port, path, "GET", null, null, null).statusCode() == 401, "Unauthenticated read denied: " + path);
@@ -172,6 +218,13 @@ public final class HostedChecks {
             check(refresh.statusCode() == 202, "Authenticated refresh accepted");
             check(request(port, "/jobs/" + job, "GET", bob.token(), null, null).statusCode() == 404, "Another account cannot inspect refresh job");
             check(request(port, "/jobs/" + job, "GET", empty.token(), null, null).statusCode() == 200, "Owner can inspect refresh job");
+            // Invalid symbols exercise admission without making any external provider calls.
+            for (int i=0;i<5;i++) request(port,"/summary?symbol=INVALID!","POST",alice.token(),"{}",origin);
+            var limited=request(port,"/summary?symbol=INVALID!","POST",alice.token(),"{}",origin);
+            check(limited.statusCode()==429 && limited.headers().firstValue("Retry-After").isPresent(),"Market limit returns HTTP 429 and retry header");
+            check(request(port,"/portfolio-analysis","POST",alice.token(),"{}",origin).statusCode()==429,"Analysis routes share a per-user budget");
+            check(request(port,"/summary?symbol=INVALID!","POST",bob.token(),"{}",origin).statusCode()==400,"One user's market throttle does not block another");
+            check(request(port,"/snapshot","GET",alice.token(),null,null).statusCode()==200,"Market throttle leaves portfolio access working");
             var login = request(port, "/auth/login", "POST", null, "{\"username\":\"alice\",\"password\":\"a-strong-test-password\"}", origin);
             check(login.statusCode() == 200 && login.headers().firstValue("set-cookie").orElse("").contains("HttpOnly"), "HTTP login issues protected session");
             check(!login.body().contains("token"), "Session token not exposed to JavaScript");
@@ -181,8 +234,40 @@ public final class HostedChecks {
             try (var conn = DatabaseConnection.getConnection(); var stmt = conn.createStatement()) { stmt.executeUpdate("UPDATE folio_sessions SET expires_at = '2000-01-01 00:00:00'"); }
             check(request(port, "/snapshot", "GET", bob.token(), null, null).statusCode() == 401, "Expired session denied");
         } finally { server.stop(); }
-        for (int i = 0; i < 20; i++) check(auth.allowAttempt(), "Budget admits allowed attempt");
-        check(!auth.allowAttempt(), "Authentication request budget enforced");
+        for (int i = 0; i < 10; i++) check(auth.allowAttempt("login",new JSONObject().put("username","alex"))==0, "Account budget admits allowed attempt");
+        check(auth.allowAttempt("login",new JSONObject().put("username","alex"))>0, "Account authentication budget enforced");
+        check(auth.allowAttempt("login",new JSONObject().put("username",address))>0,"Email alias cannot bypass username limit");
+        check(auth.allowAttempt("login",new JSONObject().put("username","alex").put("email","unrelated@example.com"))>0,"Unused email field cannot bypass login budget");
+        check(auth.allowAttempt("login",new JSONObject().put("username","bob"))==0,"Another account can sign in after first account is throttled");
+        check(auth.allowAttempt("firebase-reset",new JSONObject().put("email",address))==0,"Recovery has a separate budget from sign-in");
+        auth.allowAttempt("firebase-reset",new JSONObject().put("email",address));
+        auth.allowAttempt("firebase-reset",new JSONObject().put("email",address));
+        check(auth.allowAttempt("send-code",new JSONObject().put("email",address))>0,"Delivery routes share a recipient budget");
+        var tick=new java.util.concurrent.atomic.AtomicLong(1000);
+        var budget=new RequestBudget(tick::get,2);
+        var limit=new RequestBudget.Limit("a",1,1000);
+        check(budget.acquire(limit)==0 && budget.acquire(limit)==1,"Budget returns retry delay");
+        tick.addAndGet(1000);
+        check(budget.acquire(limit)==0,"Budget opens after expiry");
+        check(budget.acquire(new RequestBudget.Limit("b",1,1000))==0 && budget.acquire(new RequestBudget.Limit("c",1,1000))>0,"Full limiter does not evict active limits");
+        var provider=new ProviderBudget(new RequestBudget(tick::get,10),1,2);
+        provider.acquire();
+        boolean capped=false;
+        try { provider.acquire(); } catch (RateLimitException expected) { capped=expected.retryAfter()==60; }
+        check(capped,"Provider minute cap prevents further calls");
+        tick.addAndGet(60_000); provider.acquire(); tick.addAndGet(60_000);
+        capped=false;
+        try { provider.acquire(); } catch (RateLimitException expected) { capped=expected.retryAfter()>60; }
+        check(capped,"Provider daily cap survives minute-window reset");
+        var concurrentBudget=new RequestBudget();
+        var concurrentLimit=new RequestBudget.Limit("parallel",5,60_000);
+        try (var pool=Executors.newFixedThreadPool(8)) {
+            var calls=new ArrayList<Callable<Long>>();
+            for (int i=0;i<30;i++) calls.add(() -> concurrentBudget.acquire(concurrentLimit));
+            int admitted=0;
+            for (var result : pool.invokeAll(calls)) if (result.get()==0) admitted++;
+            check(admitted==5,"Concurrent requests cannot overspend a budget");
+        }
         System.out.println("Hosted checks passed: " + checks);
     }
 }

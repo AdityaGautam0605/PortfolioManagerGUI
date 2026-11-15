@@ -1,4 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { applyBrowserPolicies } from './browser-policies.js';
+
+test.beforeEach(async ({ page }) => applyBrowserPolicies(page));
 
 const snapshot = { mode: 'hosted', account: { id: 'test-alice', username: 'alice' }, positions: [], stocks: [], loadedAt: new Date().toISOString() };
 
@@ -168,6 +171,7 @@ test('another tab changing accounts clears the old workspace', async ({ page, co
   await page.goto('/');
   await expect(page.getByLabel('Account: alice', { exact: true })).toBeVisible();
   const otherTab = await context.newPage();
+  await applyBrowserPolicies(otherTab);
   await otherTab.goto('/');
   current = { ...snapshot, account: { id: 'test-bob', username: 'b'.repeat(40) } };
   await otherTab.evaluate(() => localStorage.setItem('folio-account-change', crypto.randomUUID()));

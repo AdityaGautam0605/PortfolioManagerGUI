@@ -19,7 +19,10 @@ public class StockAPI {
     @FunctionalInterface
     interface Transport { String get(String url) throws IOException, InterruptedException; }
     private final Transport transport;
-    private static final StockAPI DEFAULT = new StockAPI(StockAPI::httpGet);
+    private static final StockAPI DEFAULT = new StockAPI(StockAPI::budgetedGet);
+    private static final ProviderBudget ALPHA_BUDGET = new ProviderBudget("ALPHA",5,25);
+    private static final ProviderBudget TWELVE_BUDGET = new ProviderBudget("TWELVE",8,800);
+    private static final ProviderBudget QUOTE_BUDGET = new ProviderBudget("QUOTE",60,5000);
     private final String backupKey;
     StockAPI(Transport transport) { this(transport, System.getenv("TWELVEDATA_API_KEY")); }
     StockAPI(Transport transport, String backupKey) { this.transport = transport; this.backupKey = backupKey; }
@@ -173,6 +176,17 @@ public class StockAPI {
         } catch (RuntimeException e) {
             throw new OperationException("The data provider returned an invalid response. Try again later.", e);
         }
+    }
+
+    private static String budgetedGet(String url) throws IOException, InterruptedException {
+        String host=URI.create(url).getHost();
+        switch (host) {
+            case "www.alphavantage.co" -> ALPHA_BUDGET.acquire();
+            case "api.twelvedata.com" -> TWELVE_BUDGET.acquire();
+            case "finnhub.io" -> QUOTE_BUDGET.acquire();
+            default -> throw new IllegalArgumentException("Unknown data provider");
+        }
+        return httpGet(url);
     }
 
     static String httpGet(String url) throws IOException, InterruptedException {

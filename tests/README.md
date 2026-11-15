@@ -14,4 +14,6 @@ Live MySQL schema compatibility and real provider credentials still require inte
 
 ## Hosted accounts
 
+The hosted checks also cover Firebase revocation across devices, provider outages, restart invalidation, alternate-login rejection, account-specific login throttling and email aliases, HTTP 429 responses, independent market budgets, minute/day provider caps, and concurrent budget admission. Firebase responses and clocks are mocked; no real password reset or paid provider call is made.
+
 `HostedChecks` uses a disposable H2 2.3.232 in-memory database in PostgreSQL compatibility mode. It exercises password/session handling, API access controls, per-account portfolios, and concurrent sale protection. It never connects to the configured real portfolio. Run `tests/run-hosted-checks.ps1` with `-Jdk`, `-JavaFx`, `-JsonJar`, and `-H2Jar` paths. This validates SQL behavior against H2, not Neon/PostgreSQL TLS or the cloud deployment; perform the two-account live smoke test in `deploy/README.md` after deployment.
