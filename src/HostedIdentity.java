@@ -62,9 +62,10 @@ final class HostedIdentity {
         }
     }
     private HostedAuth.Login firebaseSession(Connection conn, HostedAuth.Account account, Grant grant) throws SQLException {
-        if (!validate(grant,true)) throw new IllegalArgumentException("Your sign-in expired. Please sign in again.");
+        // Password sign-in + lookup already confirmed fresh credentials. Only recheck aged grants.
+        if (!validate(grant,false)) throw new IllegalArgumentException("Your sign-in expired. Please sign in again.");
         var login=auth.session(conn,account);
-        remember(login.token(),new Grant(grant.uid,grant.refresh,clock.getAsLong()+86_400_000,clock.getAsLong()));
+        remember(login.token(),new Grant(grant.uid,grant.refresh,clock.getAsLong()+86_400_000,grant.checked));
         return login;
     }
 
@@ -232,6 +233,7 @@ final class HostedIdentity {
         var token = new JSONObject().put("idToken",tokens.getString("idToken"));
         JSONObject profile = firebase.apply("lookup",token).getJSONArray("users").getJSONObject(0);
         String uid = profile.getString("localId");
+        if (profile.optBoolean("disabled")) throw new IllegalArgumentException("This account cannot sign in. Please contact support.");
         if (!address.equals(email(profile.getString("email"))) || !uid.equals(tokens.getString("localId")))
             throw new IllegalArgumentException("Firebase could not confirm this account.");
         if (!profile.optBoolean("emailVerified")) {
@@ -266,6 +268,11 @@ final class HostedIdentity {
     record Result(JSONObject json, HostedAuth.Login login) {}
     Result handle(String route, JSONObject body) throws SQLException {
         if (route.equals("send-code")) { mail(body); return new Result(new JSONObject().put("sent",true), null); }
+        // Signup tickets may have waited on the username form. Revalidate before locking DB rows.
+        if (route.equals("register") && body.optBoolean("firebase")) {
+            Grant grant=grants.get(HostedAuth.digest(body.optString("ticket")));
+            if (grant==null || !validate(grant,true)) throw new IllegalArgumentException("Your signup expired. Please start again.");
+        }
         Proof googleProof = route.equals("google") ? google(body.optString("code"),origin) : null;
         try (var conn = DatabaseConnection.getConnection()) {
             conn.setAutoCommit(false);

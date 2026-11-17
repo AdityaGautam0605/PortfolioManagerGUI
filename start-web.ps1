@@ -9,6 +9,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
+$poolJars = & (Join-Path $repo 'deploy/java-libraries.ps1')
 $driveRoot = [System.IO.Path]::GetPathRoot($repo)
 if (-not $Jdk) {
     $compiler = Get-Command javac -ErrorAction SilentlyContinue
@@ -37,9 +38,9 @@ try {
     New-Item -ItemType Directory -Force $out | Out-Null
     $sources = @(Get-ChildItem (Join-Path $repo 'src/portfolioManagerGUI') -Filter '*.java' | ForEach-Object FullName)
     $sources += @('src/StockManager.java', 'src/DemoStockManager.java', 'src/WebServer.java', 'src/HostedAuth.java', 'src/HostedIdentity.java', 'src/HostedSchema.java', 'src/HostedStockManager.java')
-    & (Join-Path $Jdk 'bin/javac.exe') --module-path $JavaFx --add-modules javafx.base,jdk.httpserver -cp $JsonJar -d $out @sources
+    & (Join-Path $Jdk 'bin/javac.exe') --module-path $JavaFx --add-modules javafx.base,jdk.httpserver -cp "$JsonJar;$poolJars" -d $out @sources
     if ($LASTEXITCODE -ne 0) { throw 'Java API compilation failed' }
-    $classPath = "$out;$JsonJar;$(Join-Path $repo 'src')"
+    $classPath = "$out;$JsonJar;$poolJars;$(Join-Path $repo 'src')"
     if (-not $Demo) { $classPath += ";$MySqlJar" }
     $serverArgs = @('--port', "$Port", '--assets', (Join-Path $repo 'web/dist'))
     if ($Demo) { $serverArgs += '--demo' }

@@ -102,7 +102,10 @@ public class WebServer {
                         "/api/auth/firebase-signup","/api/auth/firebase-reset","/api/auth/firebase-check").contains(route)) {
                     JSONObject body = readBody(exchange);
                     String action = route.substring("/api/auth/".length());
-                    long retry=auth.allowAttempt(action,body);
+                    long lookupStart=System.nanoTime();
+                    var attempt=auth.prepareAttempt(action,body);
+                    timing(exchange,"auth_lookup",lookupStart);
+                    long retry=attempt.retryAfter();
                     if (retry>0) {
                         exchange.getResponseHeaders().set("Retry-After", Long.toString(retry));
                         send(exchange, 429, error("Too many sign-in attempts. Please wait a minute.")); return;
@@ -112,21 +115,25 @@ public class WebServer {
                         send(exchange,429,error("Sign-in is busy. Please try again shortly.")); return;
                     }
                     try {
+                    long signInStart=System.nanoTime();
                     if (action.equals("login") && identity.options().optBoolean("firebaseEnabled")) {
-                        String address = identity.firebaseLoginEmail(body.optString("username"));
+                        String address = attempt.firebaseEmail();
                         if (address != null) { action = "firebase-login"; body.put("email",address); }
                     }
                     if (action.startsWith("firebase-")) {
                         var result = identity.firebaseFlow(action,body);
+                        timing(exchange,"auth_flow",signInStart);
                         if (result.login() != null) exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(result.login().token()));
                         send(exchange,200,result.json()); return;
                     }
                     if (!route.endsWith("/login")) {
                         var result = identity.handle(route.substring("/api/auth/".length()), body);
+                        timing(exchange,"auth_flow",signInStart);
                         if (result.login() != null) exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(result.login().token()));
                         send(exchange, 200, result.json()); return;
                     }
                     var login = auth.login(body.optString("username"), body.optString("password"));
+                    timing(exchange,"auth_flow",signInStart);
                     if (login == null) { send(exchange, 401, error("Incorrect email, username, or password.")); return; }
                     exchange.getResponseHeaders().add("Set-Cookie", HostedAuth.cookie(login.token()));
                     send(exchange, 200, new JSONObject().put("message", "Signed in.")); return;
@@ -169,11 +176,13 @@ public class WebServer {
             }
             StockManager manager = account == null ? this.manager : new HostedStockManager(owner);
             if (method.equals("GET") && route.equals("/api/snapshot")) {
+                var saved=manager instanceof HostedStockManager hosted ? hosted.snapshot() :
+                        new HostedStockManager.Snapshot(manager.getPortfolioOverview(),manager.getAllStocks());
                 JSONArray positions = new JSONArray(), stocks = new JSONArray();
-                for (PortfolioItem item : manager.getPortfolioOverview()) positions.put(new JSONObject()
+                for (PortfolioItem item : saved.positions()) positions.put(new JSONObject()
                         .put("symbol", item.getSymbol()).put("quantity", item.getQuantity()).put("averageCost", item.getAvgBuyPrice())
                         .put("price", item.getCurrentPrice()).put("profitLoss", item.getProfitLoss()).put("returnPercent", item.getProfitLossPercent()));
-                for (StockItem item : manager.getAllStocks()) stocks.put(new JSONObject().put("symbol", item.getSymbol())
+                for (StockItem item : saved.stocks()) stocks.put(new JSONObject().put("symbol", item.getSymbol())
                         .put("name", item.getName()).put("price", item.getPrice()).put("holding", item.isHolding()));
                 JSONObject snapshot = new JSONObject().put("mode", auth != null ? "hosted" : demo ? "demo" : "connected")
                         .put("positions", positions).put("stocks", stocks).put("loadedAt", Instant.now().toString());
@@ -284,6 +293,9 @@ public class WebServer {
         if (e instanceof IllegalStateException) return "Required database or API settings are missing. Check the server configuration.";
         return "The operation could not be confirmed. Reload the portfolio before trying again.";
     }
+    private static void timing(HttpExchange exchange, String stage, long start) {
+        exchange.getResponseHeaders().add("Server-Timing",stage+";dur="+String.format(Locale.ROOT,"%.1f",(System.nanoTime()-start)/1_000_000.0));
+    }
     private static void send(HttpExchange exchange, int status, JSONObject json) throws IOException {
         byte[] bytes = json.toString().getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
@@ -333,7 +345,7 @@ public class WebServer {
         if (hosted) DatabaseConnection.validateHostedConfiguration();
         if (hosted && "true".equals(System.getenv("FOLIO_INIT_SCHEMA"))) HostedSchema.main(new String[0]);
         WebServer app = new WebServer(port, assets, demo, publicOrigin);
-        Runtime.getRuntime().addShutdownHook(new Thread(app::stop));
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> { app.stop(); DatabaseConnection.closePool(); }));
         app.start();
         System.out.println("Portfolio server listening on port " + port + " (" + (hosted ? "hosted, authentication required" : demo ? "DEMO" : "local") + ")");
     }

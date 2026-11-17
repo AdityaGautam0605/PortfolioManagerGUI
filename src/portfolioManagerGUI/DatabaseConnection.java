@@ -4,8 +4,34 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 public class DatabaseConnection {
+    private static volatile HikariDataSource pool;
+
+    public static synchronized void closePool() {
+        if (pool != null) { pool.close(); pool=null; }
+    }
+
+    private static synchronized HikariDataSource pool(String url, Properties properties) {
+        if (pool == null) {
+            HikariConfig config=new HikariConfig();
+            config.setPoolName("folio-db");
+            config.setJdbcUrl(url);
+            config.setDataSourceProperties(properties);
+            config.setMaximumPoolSize(4);
+            config.setMinimumIdle(0);
+            config.setIdleTimeout(120_000);
+            config.setMaxLifetime(600_000);
+            config.setKeepaliveTime(0);
+            config.setConnectionTimeout(15_000);
+            config.setValidationTimeout(3_000);
+            config.setInitializationFailTimeout(-1);
+            pool=new HikariDataSource(config);
+        }
+        return pool;
+    }
 
     public static void validateHostedConfiguration() {
         String url = Config.get("db.url");
@@ -24,7 +50,9 @@ public class DatabaseConnection {
         if (postgres) {
             properties.setProperty("sslmode", "verify-full");
             properties.setProperty("sslfactory", "org.postgresql.ssl.DefaultJavaSSLFactory");
+            properties.setProperty("tcpKeepAlive", "true");
         }
-        return DriverManager.getConnection(url, properties);
+        // Keep local desktop JDBC behavior; pool hosted PostgreSQL and isolated H2 tests.
+        return postgres || url.startsWith("jdbc:h2:") ? pool(url,properties).getConnection() : DriverManager.getConnection(url, properties);
     }
 }

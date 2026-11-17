@@ -111,6 +111,10 @@ The Docker build uses Maven to package the hosted Java server and its dependenci
 
 ### Session and request protections
 
+Sign-in reuses the account lookup for both throttling and provider selection. Fresh Firebase password authentication avoids an immediate redundant token refresh; delayed signup completion still revalidates its credential. Login responses include `Server-Timing` entries (`auth_lookup` and `auth_flow`) to help distinguish backend work from proxy or network delays in browser developer tools.
+
+Hosted PostgreSQL uses a HikariCP pool capped at four connections, avoiding repeated TLS/database authentication during sign-in and dashboard loading. Dashboard holdings and library reads share a single borrowed connection. Idle connections are retired after roughly two minutes, with no minimum idle connections or periodic keepalive queries, so the pool does not intentionally keep an unused database awake. Local PowerShell launchers download the pinned pool libraries to ignored `out/dependencies` on their first run; Docker resolves them through Maven.
+
 Vercel and the Java server send matching browser policies on pages, assets, and API responses: CSP, anti-framing, MIME-sniffing protection, restricted browser permissions, referrer controls, and cross-origin resource/opener policies. Hosted responses also enforce HTTPS through HSTS. CSP allows the app's own resources and Google's sign-in library; inline JavaScript and `eval` are blocked. Inline CSS remains allowed for chart styling and Google widgets. OAuth popups are supported via `same-origin-allow-popups`. Browser tests apply the production headers to the preview site and check authentication plus CSP enforcement; real Google consent still needs a post-deployment smoke test.
 
 - Firebase-backed Folio sessions revalidate with Firebase at most once per 60 seconds per active device. Completed password resets, disabled accounts, and revoked refresh credentials deny access at the next check. Merely requesting a reset email does not log users out. When a required check fails because Firebase is unavailable, access fails closed temporarily.

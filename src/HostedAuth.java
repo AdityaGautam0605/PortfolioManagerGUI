@@ -28,21 +28,30 @@ public final class HostedAuth {
     HostedAuth(StockManager.ConnectionProvider connections) { this.connections = connections; }
 
     long allowAttempt(String action, org.json.JSONObject body) throws SQLException {
+        return prepareAttempt(action,body).retryAfter();
+    }
+    record Attempt(long retryAfter, String firebaseEmail) { }
+    Attempt prepareAttempt(String action, org.json.JSONObject body) throws SQLException {
         String identifier=(action.equals("login") ? body.optString("username") :
                 action.equals("register") || action.equals("google") || action.equals("verify") ? "" : body.optString("email"))
                 .strip().toLowerCase(Locale.ROOT);
-        // Username and email aliases for an existing account share the same budget.
+        String firebaseEmail=identifier.contains("@") ? identifier : null;
+        // Resolve provider and account budget together: opening another remote DB connection is costly.
         if (!identifier.isBlank()) {
-            try (var conn=connections.open(); var stmt=conn.prepareStatement("SELECT id FROM folio_accounts WHERE username=? OR email=?")) {
+            try (var conn=connections.open(); var stmt=conn.prepareStatement("SELECT id,email,firebase_uid FROM folio_accounts WHERE username=? OR email=?")) {
                 stmt.setString(1,identifier); stmt.setString(2,identifier);
-                try (var rs=stmt.executeQuery()) { if (rs.next()) identifier=rs.getString(1); }
+                try (var rs=stmt.executeQuery()) { if (rs.next()) {
+                    identifier=rs.getString(1);
+                    firebaseEmail=rs.getString("firebase_uid")==null ? null : rs.getString("email");
+                } }
             }
         } else identifier=action.equals("register") ? body.optString("ticket","anonymous") : body.optString("code","anonymous");
         String group=action.equals("firebase-reset") || action.equals("send-code") ? "delivery" : "signin";
         int maximum=group.equals("delivery") ? 3 : 10;
-        return attempts.acquire(
+        long retry=attempts.acquire(
                 new portfolioManagerGUI.RequestBudget.Limit(group+":"+digest(identifier),maximum,60_000),
                 new portfolioManagerGUI.RequestBudget.Limit("server",300,60_000));
+        return new Attempt(retry,firebaseEmail);
     }
     static String username(String value) {
         String name = value.strip().toLowerCase(Locale.ROOT);

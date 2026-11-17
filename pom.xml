@@ -3,6 +3,8 @@
   <groupId>folio</groupId><artifactId>folio-server</artifactId><version>1.0.0</version>
   <properties><maven.compiler.release>25</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding></properties>
   <dependencies>
+    <dependency><groupId>com.zaxxer</groupId><artifactId>HikariCP</artifactId><version>7.1.0</version></dependency>
+    <dependency><groupId>org.slf4j</groupId><artifactId>slf4j-api</artifactId><version>2.0.17</version></dependency>
     <dependency><groupId>org.json</groupId><artifactId>json</artifactId><version>20240303</version></dependency>
     <dependency><groupId>org.openjfx</groupId><artifactId>javafx-base</artifactId><version>25.0.1</version></dependency>
     <dependency><groupId>org.postgresql</groupId><artifactId>postgresql</artifactId><version>42.7.14</version></dependency>

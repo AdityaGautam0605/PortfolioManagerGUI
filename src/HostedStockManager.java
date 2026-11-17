@@ -30,8 +30,11 @@ public final class HostedStockManager extends StockManager {
         return new PortfolioItem(rs.getString("symbol"), rs.getInt("quantity"), rs.getDouble("cost"), rs.getDouble("price"), rs.getDouble("profit"));
     }
     @Override public ObservableList<PortfolioItem> getPortfolioOverview() throws SQLException {
+        try (var conn=connections.open()) { return overview(conn); }
+    }
+    private ObservableList<PortfolioItem> overview(Connection conn) throws SQLException {
         var rows = FXCollections.<PortfolioItem>observableArrayList();
-        try (var conn = connections.open(); var stmt = query(conn, POSITIONS + GROUP); var rs = stmt.executeQuery()) {
+        try (var stmt = query(conn, POSITIONS + GROUP); var rs = stmt.executeQuery()) {
             while (rs.next()) rows.add(position(rs));
         }
         return rows;
@@ -45,8 +48,15 @@ public final class HostedStockManager extends StockManager {
         try (var conn = connections.open()) { return position(conn, symbol); }
     }
     @Override public ObservableList<StockItem> getAllStocks() throws SQLException {
+        try (var conn=connections.open()) { return stocks(conn); }
+    }
+    record Snapshot(List<PortfolioItem> positions, List<StockItem> stocks) { }
+    Snapshot snapshot() throws SQLException {
+        try (var conn=connections.open()) { return new Snapshot(overview(conn),stocks(conn)); }
+    }
+    private ObservableList<StockItem> stocks(Connection conn) throws SQLException {
         var rows = FXCollections.<StockItem>observableArrayList();
-        try (var conn = connections.open(); var stmt = query(conn, """
+        try (var stmt = query(conn, """
             SELECT s.symbol, s.name, s.price, COALESCE(SUM(p.quantity), 0) > 0 AS holding
             FROM folio_stocks s LEFT JOIN folio_entries p ON s.owner_id = p.owner_id AND s.symbol = p.symbol
             WHERE s.owner_id = ? GROUP BY s.symbol, s.name, s.price ORDER BY s.name

@@ -51,7 +51,10 @@ public final class HostedChecks {
         var registration = new JSONObject().put("firebase",true).put("ticket",ticket).put("username","firebase_user").put("firstName","Faye").put("lastName","Lee");
         var created = identity.handle("register",registration).login();
         check(identity.firebaseLoginEmail("firebase_user").equals(email),"Username resolves to Firebase email");
+        int callsBeforeLogin=refreshes.get();
         var second = identity.firebaseFlow("firebase-login",input).login();
+        check(refreshes.get()==callsBeforeLogin,"Fresh password login avoids redundant Firebase refresh round trip");
+        check(auth.prepareAttempt("login",new JSONObject().put("username","firebase_user")).firebaseEmail().equals(email),"Budget lookup also resolves Firebase username");
         check(second.account().equals(created.account()),"Firebase login retains portfolio owner");
         check(auth.authenticate(created.token())!=null && auth.authenticate(second.token())!=null,"Independent Firebase sessions remain valid");
         int before = refreshes.get();
@@ -94,6 +97,20 @@ public final class HostedChecks {
         if (!postgres && !url.startsWith("jdbc:h2:mem:folio_hosted_checks")) throw new IllegalStateException("Use an isolated local test database.");
         HostedSchema.main(new String[0]);
         HostedSchema.main(new String[0]);
+        if (!postgres) {
+            long physicalSession;
+            try (var conn=DatabaseConnection.getConnection(); var stmt=conn.createStatement()) {
+                stmt.execute("CREATE TABLE pool_probe (id INT)");
+                try (var rs=stmt.executeQuery("SELECT SESSION_ID()")) { rs.next(); physicalSession=rs.getLong(1); }
+                conn.setAutoCommit(false);
+                stmt.executeUpdate("INSERT INTO pool_probe VALUES (1)");
+            }
+            try (var conn=DatabaseConnection.getConnection(); var stmt=conn.createStatement()) {
+                check(conn.getAutoCommit(),"Pool resets transaction state for the next request");
+                try (var rs=stmt.executeQuery("SELECT COUNT(*) FROM pool_probe")) { rs.next(); check(rs.getInt(1)==0,"Pool rolls back abandoned transactions"); }
+                try (var rs=stmt.executeQuery("SELECT SESSION_ID()")) { rs.next(); check(rs.getLong(1)==physicalSession,"Sequential requests reuse one physical database connection"); }
+            }
+        }
         var auth = new HostedAuth();
         var summary = new StockSummary();
         var outlook = summary.portfolio(List.of(new PortfolioItem("AAPL",3,100,110,30)),true);
@@ -129,6 +146,8 @@ public final class HostedChecks {
         identity.handle("verify",new JSONObject().put("code",resetCode).put("purpose","reset").put("password","a different long password"));
         check(auth.authenticate(codeLogin.token())==null && auth.login(address,"three unrelated words")==null,"Reset revokes session and old password");
         check(auth.login(address,"a different long password")!=null,"Reset password signs in");
+        check(auth.prepareAttempt("login",new JSONObject().put("username",address)).firebaseEmail()==null,"Existing local email retains its original auth provider");
+        check(auth.prepareAttempt("login",new JSONObject().put("username","new@example.com")).firebaseEmail().equals("new@example.com"),"Unregistered email can continue Firebase onboarding");
         var alice = auth.register("Alice", "a-strong-test-password");
         var bob = auth.register("bob", "b-strong-test-password");
         check(auth.authenticate(alice.token()).username().equals("alice"), "Login token resolves its owner");
@@ -178,6 +197,9 @@ public final class HostedChecks {
         check(a.getPortfolioPosition("AAPL").getQuantity() == 10, "Alice sees her quantity");
         check(b.getPortfolioPosition("AAPL").getQuantity() == 3, "Bob sees his quantity");
         check(a.getPortfolioOverview().size() == 1 && a.getAllStocks().size() == 1, "Scoped overview and library");
+        var snapshotConnections=new java.util.concurrent.atomic.AtomicInteger();
+        var combined=new HostedStockManager(alice.account().id(),() -> { snapshotConnections.incrementAndGet(); return DatabaseConnection.getConnection(); }).snapshot();
+        check(snapshotConnections.get()==1 && combined.positions().size()==1 && combined.stocks().size()==1,"Dashboard reads share a single scoped connection");
         check(a.getPortfolioPosition("AAPL").getProfitLoss() == 500, "Scoped profit calculation");
         check(b.getAllStockSymbols().equals(List.of("AAPL")), "Scoped refresh symbols");
         try (var pool = Executors.newFixedThreadPool(2)) {
@@ -228,12 +250,14 @@ public final class HostedChecks {
             var login = request(port, "/auth/login", "POST", null, "{\"username\":\"alice\",\"password\":\"a-strong-test-password\"}", origin);
             check(login.statusCode() == 200 && login.headers().firstValue("set-cookie").orElse("").contains("HttpOnly"), "HTTP login issues protected session");
             check(!login.body().contains("token"), "Session token not exposed to JavaScript");
+            check(login.headers().allValues("Server-Timing").stream().anyMatch(value -> value.contains("auth_flow;dur=")),"Sign-in exposes non-sensitive server timing for diagnosis");
             String token = HostedAuth.token(login.headers().firstValue("set-cookie").orElseThrow());
             check(request(port, "/auth/logout", "POST", token, "{}", origin).statusCode() == 200, "Logout succeeds");
             check(request(port, "/snapshot", "GET", token, null, null).statusCode() == 401, "Logged-out session denied");
             try (var conn = DatabaseConnection.getConnection(); var stmt = conn.createStatement()) { stmt.executeUpdate("UPDATE folio_sessions SET expires_at = '2000-01-01 00:00:00'"); }
             check(request(port, "/snapshot", "GET", bob.token(), null, null).statusCode() == 401, "Expired session denied");
         } finally { server.stop(); }
+        auth = new HostedAuth(); // Isolate limiter checks from provider-routing checks above.
         for (int i = 0; i < 10; i++) check(auth.allowAttempt("login",new JSONObject().put("username","alex"))==0, "Account budget admits allowed attempt");
         check(auth.allowAttempt("login",new JSONObject().put("username","alex"))>0, "Account authentication budget enforced");
         check(auth.allowAttempt("login",new JSONObject().put("username",address))>0,"Email alias cannot bypass username limit");
@@ -269,5 +293,6 @@ public final class HostedChecks {
             check(admitted==5,"Concurrent requests cannot overspend a budget");
         }
         System.out.println("Hosted checks passed: " + checks);
+        DatabaseConnection.closePool();
     }
 }
